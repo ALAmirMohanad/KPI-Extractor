@@ -3,41 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KPI Extractor - Pro</title>
+<title>KPI Extractor</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
-  --bg:        #1a1a2e;
-  --panel:     #16213e;
-  --card:      #0f172a;
-  --input-bg:  #1e293b;
-  --border:    #2d3748;
-  --text:      #e2e8f0;
-  --text-muted:#94a3b8;
-  --text-dim:  #64748b;
-  --label:     #cbd5e1;
-  --title:     #ffffff;
-  --slot-bg:   #1e293b;
+  --bg:         #1a1a2e;
+  --panel:      #16213e;
+  --card:       #0f172a;
+  --input-bg:   #1e293b;
+  --border:     #2d3748;
+  --text:       #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-dim:   #64748b;
+  --label:      #cbd5e1;
+  --title:      #ffffff;
+  --slot-bg:    #1e293b;
   --slot-active:#3b82f6;
-  --btn-copy:  #3b82f6;
-  --btn-clear: #e53e3e;
-  --btn-back:  #276749;
-  --btn-fwd:   #6b21a8;
-  --badge-4pt: #22c55e;
+  --slot-done:  #166534;
+  --btn-copy:   #3b82f6;
+  --btn-clear:  #e53e3e;
+  --btn-start:  #16a34a;
 }
 .light {
-  --bg:        #e8eaf0;
-  --panel:     #f1f3f7;
-  --card:      #ffffff;
-  --input-bg:  #f8f9fc;
-  --border:    #c9cdd6;
-  --text:      #1a202c;
-  --text-muted:#4a5568;
-  --text-dim:  #718096;
-  --label:     #2d3748;
-  --title:     #1a202c;
-  --slot-bg:   #dde1ea;
+  --bg:         #e8eaf0;
+  --panel:      #f1f3f7;
+  --card:       #ffffff;
+  --input-bg:   #f8f9fc;
+  --border:     #c9cdd6;
+  --text:       #1a202c;
+  --text-muted: #4a5568;
+  --text-dim:   #718096;
+  --label:      #2d3748;
+  --title:      #1a202c;
+  --slot-bg:    #dde1ea;
   --slot-active:#3b82f6;
+  --slot-done:  #bbf7d0;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -60,6 +60,7 @@ body {
   max-width: 760px;
 }
 
+/* ---- Slots sidebar ---- */
 .slots {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -70,7 +71,7 @@ body {
 .slot {
   background: var(--slot-bg);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   border-radius: 5px;
   height: 28px;
@@ -79,11 +80,24 @@ body {
   justify-content: center;
   cursor: pointer;
   border: 1px solid var(--border);
-  transition: background 0.1s;
+  transition: background 0.1s, border-color 0.1s;
   user-select: none;
+  position: relative;
 }
+.slot:hover { background: var(--border); }
 .slot.active { background: var(--slot-active); color: #fff; border-color: var(--slot-active); }
+.slot.has-data { border-color: #166534; }
+.slot.has-data::after {
+  content: '';
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #4ade80;
+}
+.slot.active.has-data { background: var(--slot-active); border-color: var(--slot-active); }
 
+/* ---- Main panel ---- */
 .panel {
   flex: 1;
   background: var(--panel);
@@ -100,15 +114,6 @@ body {
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
 }
-.badge-4pt {
-  background: var(--badge-4pt);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 4px;
-  text-transform: uppercase;
-}
 .panel-title {
   font-size: 18px;
   font-weight: 800;
@@ -116,10 +121,28 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.theme-btn { background: none; border: none; font-size: 22px; cursor: pointer; }
+.slot-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 9px;
+  letter-spacing: 0.04em;
+}
+.theme-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px;
+}
 
 .panel-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
 
+/* ---- Fields ---- */
 .field label {
   display: block;
   font-size: 13px;
@@ -127,7 +150,8 @@ body {
   color: var(--label);
   margin-bottom: 5px;
 }
-.field input, .field select, .field textarea {
+.field input[type=text],
+.field select {
   width: 100%;
   background: var(--input-bg);
   border: 1px solid var(--border);
@@ -136,235 +160,838 @@ body {
   font-size: 13px;
   padding: 8px 10px;
   outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
 }
+.field input:focus, .field select:focus { border-color: var(--slot-active); }
 
+/* ---- Upload zone ---- */
 .upload-zone {
   border: 2px dashed var(--border);
   border-radius: 8px;
-  padding: 20px;
+  padding: 14px;
   text-align: center;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
   background: var(--input-bg);
 }
-.upload-zone.drag-over { border-color: var(--slot-active); background: var(--card); }
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--slot-active);
+  background: var(--card);
+}
+.upload-zone input { display: none; }
+.upload-zone p { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.upload-zone strong { font-size: 13px; color: var(--text-muted); }
 
+/* ---- Column map ---- */
 details.col-map {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 7px;
   padding: 8px 12px;
 }
-details.col-map summary { font-size: 12px; color: var(--text-dim); cursor: pointer; }
-details.col-map table { width: 100%; font-size: 12px; margin-top: 8px; border-collapse: collapse; }
-details.col-map td, details.col-map th { padding: 4px; border-bottom: 1px solid var(--border); }
-details.col-map input { width: 45px; text-align: center; text-transform: uppercase; }
-
-#start-container {
-  display: none;
-  padding: 10px;
-  background: rgba(59, 130, 246, 0.1);
-  border-radius: 8px;
-  border: 1px solid var(--slot-active);
-  text-align: center;
-}
-.btn-start {
-  background: var(--slot-active);
-  color: #fff;
-  width: 100%;
-  padding: 12px;
-  font-weight: 800;
-  border: none;
-  border-radius: 6px;
+details.col-map summary {
+  font-size: 12px;
+  color: var(--text-dim);
   cursor: pointer;
-  text-transform: uppercase;
+  user-select: none;
+}
+details.col-map table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+details.col-map td, details.col-map th {
+  padding: 4px 8px;
+  border-bottom: 0.5px solid var(--border);
+  color: var(--text-muted);
+}
+details.col-map th { font-weight: 700; color: var(--text-dim); }
+details.col-map input[type=text] {
+  width: 52px; padding: 3px 6px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--input-bg); color: var(--text);
+  text-align: center; text-transform: uppercase; outline: none;
 }
 
-#status { font-size: 11px; color: var(--text-dim); min-height: 15px; text-align: center; }
+/* ---- Status ---- */
+#status {
+  font-size: 11px;
+  color: var(--text-dim);
+  min-height: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+#status.error { color: #f87171; }
+#status.ok    { color: #4ade80; }
+#status.warn  { color: #fbbf24; }
 
-.kpi-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
-table.kpi { width: 100%; border-collapse: collapse; min-width: 500px; }
-table.kpi th { background: var(--card); padding: 10px; font-size: 10px; color: var(--text-dim); }
-table.kpi td { padding: 12px; text-align: center; border-bottom: 1px solid var(--bg); font-weight: 800; }
-table.kpi td:first-child { text-align: left; background: var(--card); font-size: 11px; }
+/* ---- Debug ---- */
+#debug-panel {
+  display: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+  max-height: 160px;
+  overflow-y: auto;
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+#debug-panel.visible { display: block; }
+.btn-debug {
+  background: var(--card);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: none;
+  align-self: flex-start;
+}
 
-td.good { background: #052e16 !important; color: #4ade80 !important; }
-td.warn { background: #431407 !important; color: #fbbf24 !important; }
-td.bad  { background: #3b0007 !important; color: #f87171 !important; }
-td.neu  { background: var(--card) !important; color: var(--text-dim) !important; }
-td.blank { background: var(--input-bg) !important; color: var(--border) !important; }
+/* ---- KPI table ---- */
+.kpi-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+table.kpi {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+table.kpi thead th {
+  background: var(--card);
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 9px 8px;
+  text-align: center;
+  border-right: 1px solid var(--bg);
+  border-bottom: 2px solid var(--bg);
+  white-space: nowrap;
+}
+table.kpi thead th:first-child { text-align: left; padding-left: 12px; width: 80px; }
+table.kpi thead th:last-child { border-right: none; }
+table.kpi tbody td {
+  padding: 9px 8px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  border-right: 1px solid var(--bg);
+  border-bottom: 1px solid var(--bg);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+table.kpi tbody td:first-child {
+  text-align: left; padding-left: 12px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  background: var(--card) !important;
+  color: var(--text-dim);
+  border-right: 2px solid var(--bg);
+}
+table.kpi tbody td:last-child { border-right: none; }
+table.kpi tbody tr:last-child td { border-bottom: none; }
 
-.actions { display: flex; gap: 8px; }
-.btn { border: none; border-radius: 7px; padding: 10px; cursor: pointer; font-weight: 700; text-transform: uppercase; flex: 1; }
-.btn-copy-main { background: var(--btn-copy); color: #fff; }
-.btn-clear { background: var(--btn-clear); color: #fff; }
+tr.t-row td { background: var(--input-bg); font-size: 12px; font-weight: 600; color: var(--text-muted); }
+tr.t-row td.editable { cursor: pointer; }
+tr.t-row td.editable:hover { filter: brightness(1.2); }
+tr.t-row td input.t-inp {
+  width: 100%; background: transparent; border: none;
+  border-bottom: 1px solid var(--slot-active);
+  color: var(--text); font-size: 12px; font-weight: 600;
+  text-align: center; outline: none; padding: 2px 0;
+}
+tr.r-row td { background: var(--card); font-size: 16px; font-weight: 800; }
+
+td.good  { background: #052e16 !important; color: #4ade80 !important; }
+td.warn  { background: #431407 !important; color: #fbbf24 !important; }
+td.bad   { background: #3b0007 !important; color: #f87171 !important; }
+td.neu   { background: var(--card) !important; color: var(--text-dim) !important; }
+td.blank { background: var(--input-bg) !important; color: var(--border) !important; font-size: 11px !important; font-weight: 500 !important; }
+
+.light td.good  { background: #dcfce7 !important; color: #15803d !important; }
+.light td.warn  { background: #fef9c3 !important; color: #a16207 !important; }
+.light td.bad   { background: #fee2e2 !important; color: #b91c1c !important; }
+
+#month-inp {
+  background: transparent; border: none;
+  border-bottom: 1px dashed var(--border);
+  color: var(--text-dim); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  width: 68px; outline: none; cursor: pointer; font-family: inherit;
+}
+
+/* ---- Actions ---- */
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.btn {
+  border: none; border-radius: 7px;
+  font-size: 13px; font-weight: 700;
+  padding: 10px 0; cursor: pointer;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  transition: filter 0.15s, opacity 0.15s;
+}
+.btn:hover { filter: brightness(1.15); }
+.btn:active { filter: brightness(0.9); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
+
+.btn-start { background: var(--btn-start); color: #fff; flex: 3; min-width: 120px; }
+.btn-copy  { background: var(--btn-copy);  color: #fff; flex: 2; min-width: 100px; }
+.btn-clear { background: var(--btn-clear); color: #fff; flex: 2; min-width: 100px; }
 </style>
 </head>
 <body>
-
 <div class="outer">
+
+  <!-- Slots sidebar -->
   <div class="slots" id="slots"></div>
 
+  <!-- Main panel -->
   <div class="panel">
+
     <div class="panel-header">
-      <span class="badge-4pt">Extraction Mode</span>
       <span class="panel-title">KPI Extractor</span>
-      <button class="theme-btn" onclick="toggleTheme()">🌙</button>
+      <span class="slot-label" id="slot-label">MEMO 1</span>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">🌙</button>
     </div>
 
     <div class="panel-body">
+
+      <!-- Agent Name -->
       <div class="field">
         <label>Agent Name :</label>
-        <input type="text" id="agent-name" placeholder="Enter name...">
+        <input type="text" id="agent-name" placeholder="Enter agent name" autocomplete="off"
+               oninput="saveField('agentName', this.value)">
       </div>
 
+      <!-- Upload -->
       <div class="field">
-        <label>Upload Excel :</label>
-        <div class="upload-zone" id="drop-zone" onclick="document.getElementById('fin').click()">
-          <input type="file" id="fin" hidden onchange="loadFile(this.files[0])">
-          <strong id="upload-label">📁 Drag & Drop or Click</strong>
+        <label>Upload Excel Sheet :</label>
+        <div class="upload-zone" id="drop-zone"
+          onclick="document.getElementById('fin').click()"
+          ondragover="onDrag(event,true)"
+          ondragleave="onDrag(event,false)"
+          ondrop="onDrop(event)">
+          <input type="file" id="fin" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(this.files[0])">
+          <strong id="upload-label">📁 Click or drag your Excel file here</strong>
+          <p>Supports .xlsx · .xls · .csv (including read-only files)</p>
         </div>
       </div>
 
-      <div id="start-container">
-        <button class="btn-start" onclick="recompute()">🚀 Start Extracting Total Results</button>
-      </div>
-
-      <details class="col-map">
-        <summary>⚙️ Column Settings</summary>
+      <!-- Column mappings -->
+      <details class="col-map" id="col-map-details">
+        <summary>⚙️ Column mappings (click to edit)</summary>
         <table>
-          <tr><th>Metric</th><th>Col</th></tr>
-          <tr><td>FCR</td><td><input id="c-fcr" value="E"></td></tr>
-          <tr><td>AHT</td><td><input id="c-aht" value="AR"></td></tr>
-          <tr><td>Trans</td><td><input id="c-trans" value="BB"></td></tr>
-          <tr><td>OB%</td><td><input id="c-ob" value=""></td></tr>
-          <tr><td>NBA</td><td><input id="c-nba" value="FL"></td></tr>
-          <tr><td>SOCs</td><td><input id="c-soc" value="DI"></td></tr>
-          <tr><td>CPC</td><td><input id="c-cpc" value="DK"></td></tr>
+          <tr><th>Metric</th><th>Column</th><th>Method</th></tr>
+          <tr><td>FCR</td>              <td><input id="c-fcr"   type="text" value="E"  oninput="saveColMap()"></td>  <td>average → %</td></tr>
+          <tr><td>AHT</td>              <td><input id="c-aht"   type="text" value="AR" oninput="saveColMap()"></td> <td>average → sec</td></tr>
+          <tr><td>Transfers</td>        <td><input id="c-trans" type="text" value="BB" oninput="saveColMap()"></td> <td>average → %</td></tr>
+          <tr><td>OB%</td>              <td><input id="c-ob"    type="text" value=""   oninput="saveColMap()"></td>   <td>leave blank</td></tr>
+          <tr><td>NBA Presentation</td> <td><input id="c-nba"   type="text" value="FL" oninput="saveColMap()"></td> <td>average → %</td></tr>
+          <tr><td>Free SOC's</td>       <td><input id="c-soc"   type="text" value="DI" oninput="saveColMap()"></td> <td>average → %</td></tr>
+          <tr><td>CPC</td>              <td><input id="c-cpc"   type="text" value="DK" oninput="saveColMap()"></td> <td>average → £</td></tr>
         </table>
       </details>
 
+      <!-- Status -->
       <div id="status"></div>
+      <div id="debug-panel"></div>
+      <button class="btn-debug" id="debug-toggle" onclick="toggleDebug()">🔍 Show debug info</button>
 
+      <!-- Targets label -->
+      <div class="field">
+        <label>Targets : <span style="font-size:11px;font-weight:400;color:var(--text-dim)">(click a value to edit)</span></label>
+      </div>
+
+      <!-- KPI Table -->
       <div class="kpi-wrap">
         <table class="kpi">
           <thead>
-            <tr><th>KPI</th><th>FCR</th><th>AHT</th><th>Trans</th><th>OB%</th><th>NBA</th><th>SOCs</th><th>CPC</th></tr>
+            <tr>
+              <th>KPI</th>
+              <th>FCR</th>
+              <th>AHT</th>
+              <th>Transfers</th>
+              <th>OB%</th>
+              <th>NBA Pres.</th>
+              <th>Free SOC's</th>
+              <th>CPC</th>
+            </tr>
           </thead>
           <tbody>
-            <tr>
+            <tr class="t-row">
               <td>Target</td>
-              <td id="t-fcr">78.7%</td><td id="t-aht">900</td><td id="t-trans">7%</td><td id="t-ob">12%</td><td id="t-nba">25%</td><td id="t-soc">15%</td><td id="t-cpc">£0.37</td>
+              <td class="editable" onclick="editTarget(this,'fcr')"   id="t-fcr">78.7%</td>
+              <td class="editable" onclick="editTarget(this,'aht')"   id="t-aht">900</td>
+              <td class="editable" onclick="editTarget(this,'trans')" id="t-trans">7%</td>
+              <td class="editable" onclick="editTarget(this,'ob')"    id="t-ob">12%</td>
+              <td class="editable" onclick="editTarget(this,'nba')"   id="t-nba">25%</td>
+              <td class="editable" onclick="editTarget(this,'soc')"   id="t-soc">15%</td>
+              <td class="editable" onclick="editTarget(this,'cpc')"   id="t-cpc">£0.37</td>
             </tr>
-            <tr>
-              <td>Result</td>
-              <td id="r-fcr" class="neu">—</td><td id="r-aht" class="neu">—</td><td id="r-trans" class="neu">—</td><td id="r-ob" class="blank">N/A</td><td id="r-nba" class="neu">—</td><td id="r-soc" class="neu">—</td><td id="r-cpc" class="neu">—</td>
+            <tr class="r-row">
+              <td><input id="month-inp" type="text" value="April" title="Click to rename"
+                         oninput="saveField('month', this.value)"></td>
+              <td class="neu" id="r-fcr">—</td>
+              <td class="neu" id="r-aht">—</td>
+              <td class="neu" id="r-trans">—</td>
+              <td class="blank" id="r-ob">N/A</td>
+              <td class="neu" id="r-nba">—</td>
+              <td class="neu" id="r-soc">—</td>
+              <td class="neu" id="r-cpc">—</td>
             </tr>
           </tbody>
         </table>
       </div>
 
+      <!-- Actions -->
       <div class="actions">
-        <button class="btn btn-copy-main" onclick="copyTable()">Copy Result</button>
-        <button class="btn btn-clear" onclick="location.reload()">Clear All</button>
+        <button class="btn btn-start" id="btn-start" onclick="startExtract()" disabled>▶ Start</button>
+        <button class="btn btn-copy"  onclick="copyTable()">Copy</button>
+        <button class="btn btn-clear" onclick="clearSlot()">Clear</button>
       </div>
+
     </div>
   </div>
 </div>
 
 <script>
-let wb = null;
-const targets = {
-  fcr:   { raw: 0.787, type: 'pct', higherBetter: true },
-  aht:   { raw: 900,   type: 'num', higherBetter: false },
-  trans: { raw: 0.07,  type: 'pct', higherBetter: false },
-  ob:    { raw: 0.12,  type: 'pct', higherBetter: true },
-  nba:   { raw: 0.25,  type: 'pct', higherBetter: true },
-  soc:   { raw: 0.15,  type: 'pct', higherBetter: true },
-  cpc:   { raw: 0.37,  type: 'gbp', higherBetter: false },
+/* =============================================================
+   SLOT STATE STORE
+   Each slot stores its own: agentName, month, colMap,
+   targets, results, fileName, wb (workbook object)
+   ============================================================= */
+const TOTAL_SLOTS = 30;
+let activeSlot = 1;
+
+// Default column map shared as starting point
+const DEFAULT_COLS = { fcr:'E', aht:'AR', trans:'BB', ob:'', nba:'FL', soc:'DI', cpc:'DK' };
+
+// Default targets
+const DEFAULT_TARGETS = {
+  fcr:   { raw: 0.787, type: 'pct', higherBetter: true,  display: '78.7%' },
+  aht:   { raw: 900,   type: 'num', higherBetter: false,  display: '900'   },
+  trans: { raw: 0.07,  type: 'pct', higherBetter: false,  display: '7%'    },
+  ob:    { raw: 0.12,  type: 'pct', higherBetter: true,   display: '12%'   },
+  nba:   { raw: 0.25,  type: 'pct', higherBetter: true,   display: '25%'   },
+  soc:   { raw: 0.15,  type: 'pct', higherBetter: true,   display: '15%'   },
+  cpc:   { raw: 0.37,  type: 'gbp', higherBetter: false,  display: '£0.37' },
 };
 
-function toggleTheme() { document.body.classList.toggle('light'); }
+function makeSlotState() {
+  return {
+    agentName: '',
+    month: 'April',
+    colMap: { ...DEFAULT_COLS },
+    targets: JSON.parse(JSON.stringify(DEFAULT_TARGETS)),
+    results: null,   // null = not yet extracted; object = extracted values
+    fileName: null,
+    wb: null,        // parsed workbook (not serialisable, lives in memory only)
+  };
+}
 
-function loadFile(file) {
+// Slots array: index 0 = slot 1
+const slots = Array.from({ length: TOTAL_SLOTS }, makeSlotState);
+
+/* =============================================================
+   BUILD SIDEBAR
+   ============================================================= */
+const slotsEl = document.getElementById('slots');
+for (let i = 1; i <= TOTAL_SLOTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'slot' + (i === 1 ? ' active' : '');
+  d.textContent = i;
+  d.dataset.slot = i;
+  d.id = 'slot-btn-' + i;
+  d.addEventListener('click', () => activateSlot(i));
+  slotsEl.appendChild(d);
+}
+
+function updateSlotDot(n) {
+  const el = document.getElementById('slot-btn-' + n);
+  if (!el) return;
+  const s = slots[n - 1];
+  el.classList.toggle('has-data', !!(s.fileName || s.results));
+}
+
+/* =============================================================
+   ACTIVATE SLOT — save current, load new
+   ============================================================= */
+function activateSlot(n) {
+  // Save any live UI edits back into current slot before switching
+  saveCurrentSlotFromUI();
+
+  activeSlot = n;
+  document.querySelectorAll('.slot').forEach(s =>
+    s.classList.toggle('active', +s.dataset.slot === n)
+  );
+  document.getElementById('slot-label').textContent = 'MEMO ' + n;
+
+  loadSlotIntoUI(n);
+}
+
+/* =============================================================
+   SAVE UI → SLOT STATE
+   ============================================================= */
+function saveCurrentSlotFromUI() {
+  const s = slots[activeSlot - 1];
+  s.agentName = document.getElementById('agent-name').value;
+  s.month     = document.getElementById('month-inp').value;
+  s.colMap    = readColMapFromUI();
+  // targets are saved immediately on edit via saveTargetDisplay()
+}
+
+function readColMapFromUI() {
+  return {
+    fcr:   document.getElementById('c-fcr').value,
+    aht:   document.getElementById('c-aht').value,
+    trans: document.getElementById('c-trans').value,
+    ob:    document.getElementById('c-ob').value,
+    nba:   document.getElementById('c-nba').value,
+    soc:   document.getElementById('c-soc').value,
+    cpc:   document.getElementById('c-cpc').value,
+  };
+}
+
+function saveField(field, val) {
+  slots[activeSlot - 1][field === 'agentName' ? 'agentName' : field] = val;
+}
+
+function saveColMap() {
+  slots[activeSlot - 1].colMap = readColMapFromUI();
+}
+
+/* =============================================================
+   LOAD SLOT STATE → UI
+   ============================================================= */
+function loadSlotIntoUI(n) {
+  const s = slots[n - 1];
+
+  document.getElementById('agent-name').value = s.agentName;
+  document.getElementById('month-inp').value  = s.month;
+
+  // Column map
+  document.getElementById('c-fcr').value   = s.colMap.fcr;
+  document.getElementById('c-aht').value   = s.colMap.aht;
+  document.getElementById('c-trans').value = s.colMap.trans;
+  document.getElementById('c-ob').value    = s.colMap.ob;
+  document.getElementById('c-nba').value   = s.colMap.nba;
+  document.getElementById('c-soc').value   = s.colMap.soc;
+  document.getElementById('c-cpc').value   = s.colMap.cpc;
+
+  // Targets
+  const KPI_KEYS = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  KPI_KEYS.forEach(k => {
+    document.getElementById('t-' + k).textContent = s.targets[k].display;
+  });
+
+  // File label
+  document.getElementById('upload-label').textContent =
+    s.fileName ? '✅ ' + s.fileName : '📁 Click or drag your Excel file here';
+
+  // Results
+  if (s.results) {
+    renderResults(s.results, s.targets);
+    setStatus('✅ Sheet: "' + (s.sheetName || '') + '" · memo ' + n, 'ok');
+  } else {
+    KPI_KEYS.forEach(k => {
+      const cell = document.getElementById('r-' + k);
+      cell.textContent = k === 'ob' ? 'N/A' : '—';
+      cell.className   = k === 'ob' ? 'blank' : 'neu';
+    });
+    setStatus('', '');
+  }
+
+  // Start button state
+  document.getElementById('btn-start').disabled = !s.wb;
+
+  // Debug
+  document.getElementById('debug-panel').textContent = '';
+  document.getElementById('debug-panel').classList.remove('visible');
+  document.getElementById('debug-toggle').style.display = 'none';
+  debugVisible = false;
+  debugLines = [];
+
+  // Reset file input so same file can be re-selected
+  document.getElementById('fin').value = '';
+}
+
+/* =============================================================
+   FILE HANDLING
+   ============================================================= */
+function onDrag(e, over) { e.preventDefault(); document.getElementById('drop-zone').classList.toggle('drag-over', over); }
+function onDrop(e) { e.preventDefault(); onDrag(e, false); if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]); }
+
+function handleFileSelect(file) {
   if (!file) return;
-  document.getElementById('upload-label').textContent = "✅ " + file.name;
+  setStatus('Reading ' + file.name + '…', '');
+  document.getElementById('upload-label').textContent = '⏳ ' + file.name;
+  document.getElementById('btn-start').disabled = true;
+
+  debugLines = [];
+  log('=== File: ' + file.name + ' ===');
+  log('Size: ' + (file.size / 1024).toFixed(1) + ' KB');
+
   const r = new FileReader();
   r.onload = e => {
-    wb = XLSX.read(e.target.result, {type:'array'});
-    document.getElementById('start-container').style.display = 'block';
-    document.getElementById('status').textContent = "File ready. Click 'Start' below.";
+    try {
+      const wb = XLSX.read(e.target.result, {
+        type: 'array',
+        cellStyles: false,
+        cellNF: true,
+        cellDates: true,
+        sheetStubs: true,
+        password: '',
+        WTF: false
+      });
+
+      log('Sheets: ' + wb.SheetNames.join(', '));
+      log('Active: "' + wb.SheetNames[0] + '"');
+
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      log('Ref: ' + (ws['!ref'] || 'MISSING'));
+      if (!ws['!ref']) { rebuildRef(ws); log('Rebuilt ref: ' + ws['!ref']); }
+
+      // Store workbook in slot
+      const s = slots[activeSlot - 1];
+      s.wb        = wb;
+      s.fileName  = file.name;
+      s.sheetName = wb.SheetNames[0];
+      s.results   = null; // new file → clear old results
+
+      document.getElementById('upload-label').textContent = '✅ ' + file.name;
+      document.getElementById('btn-start').disabled = false;
+      setStatus('File ready — press ▶ Start to extract', 'warn');
+      updateSlotDot(activeSlot);
+    } catch (err) {
+      setStatus('❌ Error: ' + err.message, 'error');
+      log('ERROR: ' + err.message);
+      showDebugBtn();
+      document.getElementById('upload-label').textContent = '❌ ' + file.name;
+    }
   };
+  r.onerror = () => { setStatus('❌ Could not read file', 'error'); };
   r.readAsArrayBuffer(file);
 }
 
-function colIndex(letters) {
-  let n = 0;
-  for (let i = 0; i < letters.length; i++) n = n*26 + (letters.toUpperCase().charCodeAt(i)-64);
-  return n-1;
-}
+/* =============================================================
+   START EXTRACTION
+   ============================================================= */
+function startExtract() {
+  const s = slots[activeSlot - 1];
+  if (!s.wb) return;
 
-function getColTotal(ws, col) {
-  if (!col) return null;
-  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-  const ci = colIndex(col);
-  let lastNum = null;
-  
-  for (let r = 0; r <= range.e.r; r++) {
-    const cell = ws[XLSX.utils.encode_cell({r, c: ci})];
-    if (cell && cell.v !== undefined && cell.v !== null) {
-      let val = typeof cell.v === 'number' ? cell.v : parseFloat(String(cell.v).replace(/[£%,\s]/g, ''));
-      if (!isNaN(val)) lastNum = val;
-    }
+  // Grab latest col map from UI before extracting
+  s.colMap = readColMapFromUI();
+
+  const ws = s.wb.Sheets[s.wb.SheetNames[0]];
+  debugLines = [];
+  log('--- Extract for memo ' + activeSlot + ' ---');
+
+  const results = {};
+  const KPI_KEYS = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  KPI_KEYS.forEach(key => {
+    if (key === 'ob') { results[key] = null; return; }
+    log('\n[' + key.toUpperCase() + '] col="' + s.colMap[key] + '"');
+    const vals = getColValues(ws, s.colMap[key]);
+    results[key] = avg(vals);
+    log('  → avg = ' + (results[key] !== null ? results[key] : 'no data'));
+  });
+
+  s.results   = results;
+  s.sheetName = s.wb.SheetNames[0];
+
+  renderResults(results, s.targets);
+
+  const anyResult = Object.values(results).some(v => v !== null);
+  if (!anyResult) {
+    setStatus('⚠️ No numeric data found.\nCheck column letters match your sheet.', 'warn');
+    showDebugBtn();
+  } else {
+    setStatus('✅ Sheet: "' + s.sheetName + '" · memo ' + activeSlot, 'ok');
+    showDebugBtn();
   }
-  return lastNum;
+
+  updateSlotDot(activeSlot);
 }
 
-function fmtVal(key, val) {
+/* =============================================================
+   RENDER RESULTS INTO TABLE
+   ============================================================= */
+function renderResults(results, targets) {
+  const KPI_KEYS = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  KPI_KEYS.forEach(key => {
+    const cell = document.getElementById('r-' + key);
+    if (key === 'ob') { cell.textContent = 'N/A'; cell.className = 'blank'; return; }
+    const val = results[key];
+    cell.textContent = fmtVal(key, val, targets[key]);
+    cell.className   = colorClass(key, val, targets[key]);
+  });
+}
+
+/* =============================================================
+   CLEAR SLOT
+   ============================================================= */
+function clearSlot() {
+  slots[activeSlot - 1] = makeSlotState();
+  loadSlotIntoUI(activeSlot);
+  updateSlotDot(activeSlot);
+  document.getElementById('fin').value = '';
+}
+
+/* =============================================================
+   TARGETS
+   ============================================================= */
+function editTarget(td, key) {
+  if (td.querySelector('input')) return;
+  const s = slots[activeSlot - 1];
+  const cur = td.textContent.trim();
+  td.textContent = '';
+  const inp = document.createElement('input');
+  inp.className = 't-inp';
+  inp.value = cur;
+  td.appendChild(inp);
+  inp.focus(); inp.select();
+  function commit() {
+    const val = inp.value.trim() || cur;
+    td.textContent = val;
+    parseTarget(s.targets, key, val);
+    s.targets[key].display = val;
+    // Re-render results with new target if we have data
+    if (s.results) renderResults(s.results, s.targets);
+  }
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+}
+
+function parseTarget(targets, key, str) {
+  const t = targets[key];
+  const num = parseFloat(str.replace(/[£%,\s]/g, ''));
+  if (isNaN(num)) return;
+  if (str.includes('%'))      { t.raw = num / 100; t.type = 'pct'; }
+  else if (str.includes('£')) { t.raw = num;       t.type = 'gbp'; }
+  else                        { t.raw = num;       t.type = 'num'; }
+}
+
+/* =============================================================
+   FORMATTING & COLOUR
+   ============================================================= */
+function colorClass(key, val, t) {
+  if (val === null || key === 'ob') return key === 'ob' ? 'blank' : 'neu';
+  const r = val / t.raw;
+  if (t.higherBetter) return r >= 0.97 ? 'good' : r >= 0.88 ? 'warn' : 'bad';
+  else                return r <= 1.03 ? 'good' : r <= 1.12 ? 'warn' : 'bad';
+}
+
+function fmtVal(key, val, t) {
   if (val === null) return '—';
-  if (targets[key].type === 'pct') return (val * 100).toFixed(1) + '%';
-  if (targets[key].type === 'gbp') return '£' + val.toFixed(2);
-  if (key === 'aht') return Math.floor(val/60) + ":" + String(Math.round(val%60)).padStart(2,'0');
+  if (t.type === 'pct') return (val * 100).toFixed(1) + '%';
+  if (t.type === 'gbp') return '£' + val.toFixed(2);
+  if (key === 'aht') { const m = Math.floor(val/60), s2 = Math.round(val%60); return m + ':' + String(s2).padStart(2,'0'); }
   return Math.round(val).toLocaleString();
 }
 
-function colorClass(key, val) {
-  if (val === null || key === 'ob') return 'neu';
-  const t = targets[key];
-  const r = val / t.raw;
-  if (t.higherBetter) return r >= 0.97 ? 'good' : r >= 0.88 ? 'warn' : 'bad';
-  else return r <= 1.03 ? 'good' : r <= 1.12 ? 'warn' : 'bad';
+/* =============================================================
+   EXCEL HELPERS
+   ============================================================= */
+function colIndex(letters) {
+  if (!letters) return -1;
+  letters = letters.toUpperCase().trim();
+  let n = 0;
+  for (let i = 0; i < letters.length; i++) n = n * 26 + (letters.charCodeAt(i) - 64);
+  return n - 1;
 }
 
-function recompute() {
-  if (!wb) return;
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const keys = ['fcr','aht','trans','ob','nba','soc','cpc'];
-  
-  keys.forEach(key => {
-    const colLetter = document.getElementById('c-' + key).value;
-    const cell = document.getElementById('r-' + key);
-    if (key === 'ob') return;
-    
-    let val = getColTotal(ws, colLetter);
-    if (val !== null) {
-      // Auto-correct percentage if Excel shows 85 instead of 0.85
-      if (targets[key].type === 'pct' && val > 1.5) val = val / 100;
-      cell.textContent = fmtVal(key, val);
-      cell.className = colorClass(key, val);
-    }
+function cellToNumber(cell) {
+  if (!cell) return null;
+  if (typeof cell.v === 'number' && !isNaN(cell.v)) return cell.v;
+  if (typeof cell.v === 'boolean') return cell.v ? 1 : 0;
+  if (typeof cell.v === 'string') {
+    const cleaned = cell.v.replace(/[£%,\s]/g, '').trim();
+    const num = parseFloat(cleaned);
+    if (!isNaN(num)) return cell.v.includes('%') ? num / 100 : num;
+  }
+  if (cell.w) {
+    const cleaned = cell.w.replace(/[£%,\s]/g, '').trim();
+    const num = parseFloat(cleaned);
+    if (!isNaN(num)) return cell.w.includes('%') ? num / 100 : num;
+  }
+  return null;
+}
+
+function getColValues(ws, col) {
+  if (!col || !col.trim()) return [];
+  col = col.toUpperCase().trim();
+  if (!ws['!ref']) { log('  ⚠ No !ref'); return []; }
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const ci = colIndex(col);
+  if (ci < 0 || ci > range.e.c) { log('  ⚠ Column ' + col + ' out of range'); return []; }
+
+  // Auto-detect start row
+  let startRow = 1;
+  for (let r = 0; r <= Math.min(9, range.e.r); r++) {
+    const cell = ws[XLSX.utils.encode_cell({ r, c: ci })];
+    if (cellToNumber(cell) !== null) { startRow = r; break; }
+  }
+  log('  Col ' + col + ': data from row ' + startRow + ' to ' + range.e.r);
+
+  const vals = [];
+  for (let r = startRow; r <= range.e.r; r++) {
+    const v = cellToNumber(ws[XLSX.utils.encode_cell({ r, c: ci })]);
+    if (v !== null) vals.push(v);
+  }
+  log('  Col ' + col + ': ' + vals.length + ' values, sample: ' + vals.slice(0,5).map(x => x.toFixed ? x.toFixed(3) : x).join(', '));
+  return vals;
+}
+
+function avg(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null; }
+
+function rebuildRef(ws) {
+  let minR=Infinity,maxR=-Infinity,minC=Infinity,maxC=-Infinity;
+  Object.keys(ws).forEach(k => {
+    if (k.startsWith('!')) return;
+    const d = XLSX.utils.decode_cell(k);
+    if (d.r<minR) minR=d.r; if (d.r>maxR) maxR=d.r;
+    if (d.c<minC) minC=d.c; if (d.c>maxC) maxC=d.c;
   });
-  document.getElementById('status').textContent = "Results updated based on column totals.";
+  if (maxR >= 0) ws['!ref'] = XLSX.utils.encode_range({s:{r:minR,c:minC},e:{r:maxR,c:maxC}});
+}
+
+/* =============================================================
+   STATUS / DEBUG
+   ============================================================= */
+let debugLines = [];
+let debugVisible = false;
+
+function log(msg) {
+  debugLines.push(msg);
+  document.getElementById('debug-panel').textContent = debugLines.join('\n');
+}
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+function showDebugBtn() {
+  document.getElementById('debug-toggle').style.display = 'block';
+}
+function toggleDebug() {
+  debugVisible = !debugVisible;
+  document.getElementById('debug-panel').classList.toggle('visible', debugVisible);
+  document.getElementById('debug-toggle').textContent = debugVisible ? '🔍 Hide debug info' : '🔍 Show debug info';
+}
+
+/* =============================================================
+   COPY
+   ============================================================= */
+function buildHtmlTable() {
+  const headers = ['KPI','FCR','AHT','Transfers','OB%','NBA Presentation',"Free SOC's",'CPC'];
+  const tKeys   = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  const s       = slots[activeSlot - 1];
+  const month   = document.getElementById('month-inp').value || 'Result';
+  const agent   = document.getElementById('agent-name').value.trim();
+
+  const tData = tKeys.map(k => ({ val: s.targets[k].display }));
+  const rData = tKeys.map(k => {
+    const el  = document.getElementById('r-' + k);
+    const cls = el.className;
+    const bg    = cls==='good'?'#d1fae5':cls==='warn'?'#fef3c7':cls==='bad'?'#fee2e2':cls==='blank'?'#f1f5f9':'#f8fafc';
+    const color = cls==='good'?'#065f46':cls==='warn'?'#92400e':cls==='bad'?'#991b1b':cls==='blank'?'#94a3b8':'#475569';
+    return { val: el.textContent.trim(), bg, color };
+  });
+
+  const tableS  = 'border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;background:#ffffff;width:100%;';
+  const agentS  = 'background:#f1f5f9;color:#334155;font-size:13px;padding:10px 12px;border:1px solid #e2e8f0;font-weight:600;';
+  const thS     = 'background:#1e293b;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:10px 12px;text-align:center;border:1px solid #334155;white-space:nowrap;';
+  const th1S    = thS + 'text-align:left;';
+  const tdLblS  = 'background:#334155;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;padding:10px 12px;text-align:left;border:1px solid #475569;white-space:nowrap;';
+  const tdTgtS  = 'background:#f8fafc;color:#64748b;font-size:13px;font-weight:600;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;';
+
+  let html = '<table style="'+tableS+'">';
+  if (agent) html += '<tr><td colspan="8" style="'+agentS+'">&#128100; Agent: <span style="color:#0f172a;font-size:14px;">'+agent+'</span></td></tr>';
+  html += '<tr><th style="'+th1S+'">KPI</th>';
+  headers.slice(1).forEach(h => { html += '<th style="'+thS+'">'+h+'</th>'; });
+  html += '</tr><tr><td style="'+tdLblS+'">Target</td>';
+  tData.forEach(d => { html += '<td style="'+tdTgtS+'">'+d.val+'</td>'; });
+  html += '</tr><tr><td style="'+tdLblS+'">'+month+'</td>';
+  rData.forEach(d => {
+    html += '<td style="background:'+d.bg+';color:'+d.color+';font-size:15px;font-weight:800;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;">'+d.val+'</td>';
+  });
+  html += '</tr></table>';
+  return html;
 }
 
 function copyTable() {
-  const agent = document.getElementById('agent-name').value || "Agent";
-  let text = `KPI Results for ${agent}\n`;
-  ['fcr','aht','trans','ob','nba','soc','cpc'].forEach(k => {
-    text += `${k.toUpperCase()}: ${document.getElementById('r-'+k).textContent}\n`;
-  });
-  navigator.clipboard.writeText(text);
-  alert("Results copied to clipboard!");
+  const tKeys = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  const s     = slots[activeSlot - 1];
+  const month = document.getElementById('month-inp').value || 'Result';
+  const agent = document.getElementById('agent-name').value.trim();
+  const headers = ['KPI','FCR','AHT','Transfers','OB%','NBA Presentation',"Free SOC's",'CPC'];
+  const tVals = ['Target', ...tKeys.map(k => s.targets[k].display)];
+  const rVals = [month,    ...tKeys.map(k => document.getElementById('r-'+k).textContent.trim())];
+  const plain = (agent ? 'Agent: '+agent+'\n' : '') + [headers,tVals,rVals].map(r=>r.join('\t')).join('\n');
+  const html  = buildHtmlTable();
+
+  const btn  = document.querySelector('.btn-copy');
+  const done = () => { btn.textContent='✓ Copied!'; setTimeout(()=>btn.textContent='Copy',2200); };
+  const container = document.createElement('div');
+  container.contentEditable='true';
+  container.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;';
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+    navigator.clipboard.write([new ClipboardItem({
+      'text/html':  new Blob([html],  {type:'text/html'}),
+      'text/plain': new Blob([plain], {type:'text/plain'}),
+    })]).then(()=>{ document.body.removeChild(container); done(); })
+       .catch(()=>execCopy(container, plain, done));
+  } else {
+    execCopy(container, plain, done);
+  }
 }
+
+function execCopy(container, plain, done) {
+  const sel=window.getSelection(), range=document.createRange();
+  range.selectNodeContents(container); sel.removeAllRanges(); sel.addRange(range);
+  try { document.execCommand('copy'); }
+  catch(e) {
+    const ta=document.createElement('textarea');
+    ta.value=plain; ta.style.cssText='position:fixed;left:-9999px;top:0;';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  }
+  sel.removeAllRanges();
+  if (container.parentNode) document.body.removeChild(container);
+  done();
+}
+
+/* =============================================================
+   THEME
+   ============================================================= */
+let isDark = true;
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.classList.toggle('light', !isDark);
+  document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
+}
+
+/* =============================================================
+   INIT
+   ============================================================= */
+loadSlotIntoUI(1);
 </script>
 </body>
 </html>

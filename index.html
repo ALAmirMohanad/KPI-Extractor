@@ -648,25 +648,31 @@ function handleFileSelect(file) {
   const r = new FileReader();
   r.onload = e => {
     try {
-      const wb = XLSX.read(e.target.result, {
-        type: 'array',
-        cellStyles: false,
-        cellNF: true,
-        cellDates: true,
-        sheetStubs: true,
-        dense: false,
-        raw: false,
-        password: '',
-        WTF: false
-      });
+      // Try multiple parse strategies for read-only files
+      let wb;
+      const parseOpts = [
+        { type:'array', raw:true,  cellNF:true,  cellDates:false, bookVBA:true, bookFiles:true, WTF:false },
+        { type:'array', raw:false, cellNF:true,  cellDates:false, WTF:false },
+        { type:'array', raw:true,  cellNF:false, cellDates:false, WTF:false },
+      ];
+      for (const opts of parseOpts) {
+        try {
+          wb = XLSX.read(e.target.result, opts);
+          const ws0 = wb.Sheets[wb.SheetNames[0]];
+          rebuildRef(ws0);
+          const cellCount = Object.keys(ws0).filter(k => !k.startsWith('!')).length;
+          log('Parse attempt opts=' + JSON.stringify(opts) + ' → cells=' + cellCount + ' ref=' + ws0['!ref']);
+          if (cellCount > 5) break; // good parse
+        } catch(pe) { log('Parse attempt failed: ' + pe.message); }
+      }
 
       log('Sheets: ' + wb.SheetNames.join(', '));
       log('Active: "' + wb.SheetNames[0] + '"');
 
       const ws = wb.Sheets[wb.SheetNames[0]];
-      log('Ref before rebuild: ' + (ws['!ref'] || 'MISSING'));
       rebuildRef(ws);
-      log('Ref after rebuild: ' + (ws['!ref'] || 'STILL MISSING'));
+      log('Final ref: ' + (ws['!ref'] || 'MISSING'));
+      log('Cell count: ' + Object.keys(ws).filter(k=>!k.startsWith('!')).length);
 
       // Store workbook in slot
       const s = slots[activeSlot - 1];

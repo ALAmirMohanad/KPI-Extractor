@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KPI Extractor</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<title>KPI Extractor — Offline</title>
+<!-- NO external dependencies. ZIP + XML parsed natively in the browser. -->
 <style>
 :root {
   --bg:         #1a1a2e;
@@ -385,9 +385,9 @@ td.blank { background: var(--input-bg) !important; color: var(--border) !importa
           ondragover="onDrag(event,true)"
           ondragleave="onDrag(event,false)"
           ondrop="onDrop(event)">
-          <input type="file" id="fin" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(this.files[0])">
+          <input type="file" id="fin" accept=".xlsx" onchange="handleFileSelect(this.files[0])">
           <strong id="upload-label">📁 Click or drag your Excel file here</strong>
-          <p>Supports .xlsx · .xls · .csv (including read-only files)</p>
+          <p>Supports .xlsx · Works 100% offline · No internet required</p>
         </div>
       </div>
 
@@ -397,12 +397,12 @@ td.blank { background: var(--input-bg) !important; color: var(--border) !importa
         <table>
           <tr><th>Metric</th><th>Column</th><th>Method</th></tr>
           <tr><td>FCR</td>              <td><input id="c-fcr"   type="text" value="E"  oninput="saveColMap()"></td>  <td>last value → %</td></tr>
-          <tr><td>AHT</td>              <td><input id="c-aht"   type="text" value="AR" oninput="saveColMap()"></td> <td>last value → sec</td></tr>
-          <tr><td>Transfers</td>        <td><input id="c-trans" type="text" value="BB" oninput="saveColMap()"></td> <td>last value → %</td></tr>
-          <tr><td>OB%</td>              <td><input id="c-ob"    type="text" value=""   oninput="saveColMap()"></td>   <td>leave blank</td></tr>
-          <tr><td>NBA Presentation</td> <td><input id="c-nba"   type="text" value="FL" oninput="saveColMap()"></td> <td>last value → %</td></tr>
-          <tr><td>Free SOC's</td>       <td><input id="c-soc"   type="text" value="DI" oninput="saveColMap()"></td> <td>last value → %</td></tr>
-          <tr><td>CPC</td>              <td><input id="c-cpc"   type="text" value="DK" oninput="saveColMap()"></td> <td>last value → £</td></tr>
+          <tr><td>AHT</td>              <td><input id="c-aht"   type="text" value="AR" oninput="saveColMap()"></td>  <td>last value → sec</td></tr>
+          <tr><td>Transfers</td>        <td><input id="c-trans" type="text" value="BB" oninput="saveColMap()"></td>  <td>last value → %</td></tr>
+          <tr><td>OB%</td>              <td><input id="c-ob"    type="text" value=""   oninput="saveColMap()"></td>  <td>leave blank</td></tr>
+          <tr><td>NBA Presentation</td> <td><input id="c-nba"   type="text" value="FL" oninput="saveColMap()"></td>  <td>last value → %</td></tr>
+          <tr><td>Free SOC's</td>       <td><input id="c-soc"   type="text" value="DI" oninput="saveColMap()"></td>  <td>last value → %</td></tr>
+          <tr><td>CPC</td>              <td><input id="c-cpc"   type="text" value="DK" oninput="saveColMap()"></td>  <td>last value → £</td></tr>
         </table>
       </details>
 
@@ -471,16 +471,12 @@ td.blank { background: var(--input-bg) !important; color: var(--border) !importa
 <script>
 /* =============================================================
    SLOT STATE STORE
-   Each slot stores its own: agentName, month, colMap,
-   targets, results, fileName, wb (workbook object)
    ============================================================= */
 const TOTAL_SLOTS = 30;
 let activeSlot = 1;
 
-// Default column map shared as starting point
 const DEFAULT_COLS = { fcr:'E', aht:'AR', trans:'BB', ob:'', nba:'FL', soc:'DI', cpc:'DK' };
 
-// Default targets
 const DEFAULT_TARGETS = {
   fcr:   { raw: 0.787, type: 'pct', higherBetter: true,  display: '78.7%' },
   aht:   { raw: 900,   type: 'num', higherBetter: false,  display: '900'   },
@@ -494,16 +490,16 @@ const DEFAULT_TARGETS = {
 function makeSlotState() {
   return {
     agentName: '',
-    month: 'April',
-    colMap: { ...DEFAULT_COLS },
-    targets: JSON.parse(JSON.stringify(DEFAULT_TARGETS)),
-    results: null,   // null = not yet extracted; object = extracted values
-    fileName: null,
-    wb: null,        // parsed workbook (not serialisable, lives in memory only)
+    month:     'April',
+    colMap:    { ...DEFAULT_COLS },
+    targets:   JSON.parse(JSON.stringify(DEFAULT_TARGETS)),
+    results:   null,
+    fileName:  null,
+    sheetDoc:  null,   // DOMDocument of xl/worksheets/sheet1.xml
+    ssDoc:     null,   // DOMDocument of xl/sharedStrings.xml (may be null)
   };
 }
 
-// Slots array: index 0 = slot 1
 const slots = Array.from({ length: TOTAL_SLOTS }, makeSlotState);
 
 /* =============================================================
@@ -512,10 +508,10 @@ const slots = Array.from({ length: TOTAL_SLOTS }, makeSlotState);
 const slotsEl = document.getElementById('slots');
 for (let i = 1; i <= TOTAL_SLOTS; i++) {
   const d = document.createElement('div');
-  d.className = 'slot' + (i === 1 ? ' active' : '');
+  d.className   = 'slot' + (i === 1 ? ' active' : '');
   d.textContent = i;
   d.dataset.slot = i;
-  d.id = 'slot-btn-' + i;
+  d.id          = 'slot-btn-' + i;
   d.addEventListener('click', () => activateSlot(i));
   slotsEl.appendChild(d);
 }
@@ -528,18 +524,15 @@ function updateSlotDot(n) {
 }
 
 /* =============================================================
-   ACTIVATE SLOT — save current, load new
+   ACTIVATE SLOT
    ============================================================= */
 function activateSlot(n) {
-  // Save any live UI edits back into current slot before switching
   saveCurrentSlotFromUI();
-
   activeSlot = n;
   document.querySelectorAll('.slot').forEach(s =>
     s.classList.toggle('active', +s.dataset.slot === n)
   );
   document.getElementById('slot-label').textContent = 'MEMO ' + n;
-
   loadSlotIntoUI(n);
 }
 
@@ -547,29 +540,27 @@ function activateSlot(n) {
    SAVE UI → SLOT STATE
    ============================================================= */
 function saveCurrentSlotFromUI() {
-  const s = slots[activeSlot - 1];
+  const s    = slots[activeSlot - 1];
   s.agentName = document.getElementById('agent-name').value;
   s.month     = document.getElementById('month-inp').value;
   s.colMap    = readColMapFromUI();
-  // targets are saved immediately on edit via saveTargetDisplay()
 }
 
 function readColMapFromUI() {
   return {
-    fcr:   document.getElementById('c-fcr').value,
-    aht:   document.getElementById('c-aht').value,
-    trans: document.getElementById('c-trans').value,
-    ob:    document.getElementById('c-ob').value,
-    nba:   document.getElementById('c-nba').value,
-    soc:   document.getElementById('c-soc').value,
-    cpc:   document.getElementById('c-cpc').value,
+    fcr:   document.getElementById('c-fcr').value.trim().toUpperCase(),
+    aht:   document.getElementById('c-aht').value.trim().toUpperCase(),
+    trans: document.getElementById('c-trans').value.trim().toUpperCase(),
+    ob:    document.getElementById('c-ob').value.trim().toUpperCase(),
+    nba:   document.getElementById('c-nba').value.trim().toUpperCase(),
+    soc:   document.getElementById('c-soc').value.trim().toUpperCase(),
+    cpc:   document.getElementById('c-cpc').value.trim().toUpperCase(),
   };
 }
 
 function saveField(field, val) {
   slots[activeSlot - 1][field === 'agentName' ? 'agentName' : field] = val;
 }
-
 function saveColMap() {
   slots[activeSlot - 1].colMap = readColMapFromUI();
 }
@@ -583,7 +574,6 @@ function loadSlotIntoUI(n) {
   document.getElementById('agent-name').value = s.agentName;
   document.getElementById('month-inp').value  = s.month;
 
-  // Column map
   document.getElementById('c-fcr').value   = s.colMap.fcr;
   document.getElementById('c-aht').value   = s.colMap.aht;
   document.getElementById('c-trans').value = s.colMap.trans;
@@ -592,20 +582,17 @@ function loadSlotIntoUI(n) {
   document.getElementById('c-soc').value   = s.colMap.soc;
   document.getElementById('c-cpc').value   = s.colMap.cpc;
 
-  // Targets
   const KPI_KEYS = ['fcr','aht','trans','ob','nba','soc','cpc'];
   KPI_KEYS.forEach(k => {
     document.getElementById('t-' + k).textContent = s.targets[k].display;
   });
 
-  // File label
   document.getElementById('upload-label').textContent =
     s.fileName ? '✅ ' + s.fileName : '📁 Click or drag your Excel file here';
 
-  // Results
   if (s.results) {
     renderResults(s.results, s.targets);
-    setStatus('✅ Sheet: "' + (s.sheetName || '') + '" · memo ' + n, 'ok');
+    setStatus('✅ Loaded · memo ' + n, 'ok');
   } else {
     KPI_KEYS.forEach(k => {
       const cell = document.getElementById('r-' + k);
@@ -615,85 +602,341 @@ function loadSlotIntoUI(n) {
     setStatus('', '');
   }
 
-  // Start button state
-  document.getElementById('btn-start').disabled = !s.wb;
+  document.getElementById('btn-start').disabled = !s.sheetDoc;
 
-  // Debug
   document.getElementById('debug-panel').textContent = '';
   document.getElementById('debug-panel').classList.remove('visible');
   document.getElementById('debug-toggle').style.display = 'none';
   debugVisible = false;
-  debugLines = [];
-
-  // Reset file input so same file can be re-selected
+  debugLines   = [];
   document.getElementById('fin').value = '';
 }
 
 /* =============================================================
-   FILE HANDLING
+   STATUS / DEBUG
    ============================================================= */
-function onDrag(e, over) { e.preventDefault(); document.getElementById('drop-zone').classList.toggle('drag-over', over); }
-function onDrop(e) { e.preventDefault(); onDrag(e, false); if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]); }
+let debugLines   = [];
+let debugVisible = false;
 
-function handleFileSelect(file) {
+function log(msg) {
+  debugLines.push(msg);
+  document.getElementById('debug-panel').textContent = debugLines.join('\n');
+}
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className   = cls || '';
+}
+function showDebugBtn() {
+  document.getElementById('debug-toggle').style.display = 'block';
+}
+function toggleDebug() {
+  debugVisible = !debugVisible;
+  document.getElementById('debug-panel').classList.toggle('visible', debugVisible);
+  document.getElementById('debug-toggle').textContent = debugVisible ? '🔍 Hide debug info' : '🔍 Show debug info';
+}
+
+/* =============================================================
+   DRAG / DROP
+   ============================================================= */
+function onDrag(e, over) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.toggle('drag-over', over);
+}
+function onDrop(e) {
+  e.preventDefault();
+  onDrag(e, false);
+  if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
+}
+
+/* =============================================================
+   PURE-JS ZIP READER  (no library needed)
+   Reads the ZIP central directory, then decompresses each
+   requested file using the browser's built-in DecompressionStream.
+   ============================================================= */
+function u16(b, o) { return b[o] | (b[o+1] << 8); }
+function u32(b, o) { return (b[o] | (b[o+1]<<8) | (b[o+2]<<16) | (b[o+3]<<24)) >>> 0; }
+
+async function deflateRaw(compressedBytes) {
+  if (!window.DecompressionStream) {
+    throw new Error(
+      'DecompressionStream is not available in this browser.\n' +
+      'Please use Chrome 80+, Edge 80+, Firefox 113+, or Safari 16.4+.'
+    );
+  }
+  const ds     = new DecompressionStream('deflate-raw');
+  const writer = ds.writable.getWriter();
+  const reader = ds.readable.getReader();
+  writer.write(compressedBytes);
+  writer.close();
+
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const total  = chunks.reduce((a, c) => a + c.length, 0);
+  const merged = new Uint8Array(total);
+  let   off    = 0;
+  for (const c of chunks) { merged.set(c, off); off += c.length; }
+  return new TextDecoder('utf-8').decode(merged);
+}
+
+/**
+ * unzipEntries(arrayBuffer, wantedNames)
+ * Returns an object { 'xl/worksheets/sheet1.xml': '...xml text...', ... }
+ * for only the file names listed in wantedNames.
+ */
+async function unzipEntries(arrayBuffer, wantedNames) {
+  const b      = new Uint8Array(arrayBuffer);
+  const result = {};
+
+  /* ---- locate End-of-Central-Directory (EOCD) ---- */
+  let eocd = -1;
+  const maxScan = Math.min(b.length, 65558 + 22);
+  for (let i = b.length - 22; i >= b.length - maxScan; i--) {
+    if (b[i]===0x50 && b[i+1]===0x4B && b[i+2]===0x05 && b[i+3]===0x06) {
+      eocd = i; break;
+    }
+  }
+  if (eocd < 0) throw new Error('Not a valid ZIP / XLSX file (EOCD record missing).');
+
+  const cdCount  = u16(b, eocd + 10);
+  const cdOffset = u32(b, eocd + 16);
+
+  /* ---- walk central directory ---- */
+  let pos = cdOffset;
+  for (let i = 0; i < cdCount; i++) {
+    if (u32(b, pos) !== 0x02014B50) break;        // central dir signature
+
+    const method      = u16(b, pos + 10);
+    const compSize    = u32(b, pos + 20);
+    const fnLen       = u16(b, pos + 28);
+    const extraLen    = u16(b, pos + 30);
+    const commentLen  = u16(b, pos + 32);
+    const localOff    = u32(b, pos + 42);
+    const name        = new TextDecoder().decode(b.slice(pos + 46, pos + 46 + fnLen));
+
+    if (wantedNames.includes(name)) {
+      /* read local-file-header to get actual data offset */
+      const lhFnLen    = u16(b, localOff + 26);
+      const lhExtraLen = u16(b, localOff + 28);
+      const dataStart  = localOff + 30 + lhFnLen + lhExtraLen;
+      const compressed = b.slice(dataStart, dataStart + compSize);
+
+      if (method === 0) {
+        // Stored (no compression)
+        result[name] = new TextDecoder('utf-8').decode(compressed);
+      } else if (method === 8) {
+        // DEFLATE
+        result[name] = await deflateRaw(compressed);
+      } else {
+        throw new Error('Unsupported ZIP compression method ' + method + ' for "' + name + '"');
+      }
+    }
+
+    pos += 46 + fnLen + extraLen + commentLen;
+  }
+
+  return result;
+}
+
+/* =============================================================
+   XML HELPERS  (namespace-safe via getElementsByTagName)
+   ============================================================= */
+
+/** Resolve a shared-string index to its plain-text value */
+function getSharedString(ssDoc, idx) {
+  if (!ssDoc) return '';
+  const sis = ssDoc.getElementsByTagName('si');
+  const si  = sis[parseInt(idx, 10)];
+  if (!si) return '';
+  // Concatenate all <t> descendants (handles rich-text runs)
+  return Array.from(si.getElementsByTagName('t')).map(t => t.textContent).join('');
+}
+
+/** Strip the row number from a cell reference: "AR57" → "AR" */
+function cellCol(ref) { return ref.replace(/\d+$/, '').toUpperCase(); }
+
+/** Strip the column letters from a cell reference: "AR57" → 57 */
+function cellRow(ref) { return parseInt(ref.replace(/[A-Z]+/i, ''), 10); }
+
+/**
+ * Convert column letters to 0-based index.
+ * A→0, B→1, Z→25, AA→26, BB→53, AR→43, BB→53, FL→163, DI→112, DK→114
+ */
+function colIndex(letters) {
+  if (!letters) return -1;
+  letters = letters.toUpperCase().trim();
+  let n = 0;
+  for (let i = 0; i < letters.length; i++) n = n * 26 + (letters.charCodeAt(i) - 64);
+  return n - 1; // convert to 0-based
+}
+
+/** Return the numeric value stored in a cell's <v> element, or null. */
+function getCellNumber(cell) {
+  const t  = cell.getAttribute('t') || '';
+  // 's' = shared string (text), 'e' = error, 'str' = formula string result
+  if (t === 's' || t === 'e') return null;
+  const vs = cell.getElementsByTagName('v');
+  if (!vs.length) return null;
+  const n = parseFloat(vs[0].textContent.trim());
+  return isNaN(n) ? null : n;
+}
+
+/** Return text value of a cell (resolving shared strings). */
+function getCellText(cell, ssDoc) {
+  const t  = cell.getAttribute('t') || '';
+  const vs = cell.getElementsByTagName('v');
+  if (!vs.length) return '';
+  const raw = vs[0].textContent.trim();
+  return t === 's' ? getSharedString(ssDoc, raw) : raw;
+}
+
+/* =============================================================
+   CORE EXTRACTION
+   Scans the parsed sheet XML and finds the value to use for a
+   given column letter using two strategies:
+     1. If a "Total" row exists in column A → use that cell.
+     2. Otherwise → the last numeric value in the column (row ≥ 3).
+   ============================================================= */
+function extractColValue(sheetDoc, ssDoc, targetColLetters, kpiType) {
+  targetColLetters = (targetColLetters || '').toUpperCase().trim();
+  if (!targetColLetters) return null;
+
+  const cells = Array.from(sheetDoc.getElementsByTagName('c'));
+
+  /* --- Strategy 1: find a "Total" row in column A --- */
+  let totalRow = -1;
+  for (const cell of cells) {
+    const ref = cell.getAttribute('r') || '';
+    if (!ref || cellCol(ref) !== 'A') continue;
+    const txt = getCellText(cell, ssDoc).trim().toLowerCase();
+    if (txt === 'total' || txt === 'totals') {
+      totalRow = cellRow(ref);
+      log('  Total row detected at row ' + totalRow + ' (col A text: "' + txt + '")');
+      break;
+    }
+  }
+
+  /* --- Scan target column --- */
+  let lastVal = null;
+  let lastRow = -1;
+
+  for (const cell of cells) {
+    const ref = cell.getAttribute('r') || '';
+    if (!ref) continue;
+    const col = cellCol(ref);
+    if (col !== targetColLetters) continue;
+    const row = cellRow(ref);
+
+    if (totalRow > 0) {
+      /* Strategy 1 active: only read from the total row */
+      if (row === totalRow) {
+        const n = getCellNumber(cell);
+        if (n !== null) { lastVal = n; lastRow = row; }
+      }
+    } else {
+      /* Strategy 2: last numeric value, skip header rows (rows 1–2) */
+      if (row < 3) continue;
+      const n = getCellNumber(cell);
+      if (n !== null) { lastVal = n; lastRow = row; }
+    }
+  }
+
+  if (lastVal === null) {
+    log('  Col ' + targetColLetters + ': ⚠ no numeric data found');
+    return null;
+  }
+
+  log('  Col ' + targetColLetters + ': raw XML value = ' + lastVal + '  (row ' + lastRow + ')');
+
+  /* --- Auto-correct percentages ---
+     Excel stores 85 % as 0.85 normally, but some reports store it as 85.
+     If the KPI type is "pct" and the value is > 1, divide by 100.          */
+  if (kpiType === 'pct' && lastVal > 1) {
+    lastVal /= 100;
+    log('  Col ' + targetColLetters + ': auto-corrected pct → ' + lastVal.toFixed(5));
+  }
+
+  return lastVal;
+}
+
+/* =============================================================
+   FILE HANDLING  (async — no XLSX.js required)
+   ============================================================= */
+async function handleFileSelect(file) {
   if (!file) return;
+
   setStatus('Reading ' + file.name + '…', '');
   document.getElementById('upload-label').textContent = '⏳ ' + file.name;
   document.getElementById('btn-start').disabled = true;
-
   debugLines = [];
   log('=== File: ' + file.name + ' ===');
   log('Size: ' + (file.size / 1024).toFixed(1) + ' KB');
 
-  const r = new FileReader();
-  r.onload = e => {
-    try {
-      // Try multiple parse strategies for read-only files
-      let wb;
-      const parseOpts = [
-        { type:'array', raw:true,  cellNF:true,  cellDates:false, bookVBA:true, bookFiles:true, WTF:false },
-        { type:'array', raw:false, cellNF:true,  cellDates:false, WTF:false },
-        { type:'array', raw:true,  cellNF:false, cellDates:false, WTF:false },
-      ];
-      for (const opts of parseOpts) {
-        try {
-          wb = XLSX.read(e.target.result, opts);
-          const ws0 = wb.Sheets[wb.SheetNames[0]];
-          rebuildRef(ws0);
-          const cellCount = Object.keys(ws0).filter(k => !k.startsWith('!')).length;
-          log('Parse attempt opts=' + JSON.stringify(opts) + ' → cells=' + cellCount + ' ref=' + ws0['!ref']);
-          if (cellCount > 5) break; // good parse
-        } catch(pe) { log('Parse attempt failed: ' + pe.message); }
-      }
+  try {
+    const arrayBuffer = await file.arrayBuffer();
 
-      log('Sheets: ' + wb.SheetNames.join(', '));
-      log('Active: "' + wb.SheetNames[0] + '"');
+    /* We need the worksheet XML and (optionally) the shared strings */
+    const wanted = [
+      'xl/worksheets/sheet1.xml',
+      'xl/sharedStrings.xml',
+    ];
 
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      rebuildRef(ws);
-      log('Final ref: ' + (ws['!ref'] || 'MISSING'));
-      log('Cell count: ' + Object.keys(ws).filter(k=>!k.startsWith('!')).length);
+    log('Unzipping XLSX (native browser ZIP reader)…');
+    const extracted = await unzipEntries(arrayBuffer, wanted);
 
-      // Store workbook in slot
-      const s = slots[activeSlot - 1];
-      s.wb        = wb;
-      s.fileName  = file.name;
-      s.sheetName = wb.SheetNames[0];
-      s.results   = null; // new file → clear old results
-
-      document.getElementById('upload-label').textContent = '✅ ' + file.name;
-      document.getElementById('btn-start').disabled = false;
-      setStatus('File ready — press ▶ Start to extract', 'warn');
-      updateSlotDot(activeSlot);
-    } catch (err) {
-      setStatus('❌ Error: ' + err.message, 'error');
-      log('ERROR: ' + err.message);
-      showDebugBtn();
-      document.getElementById('upload-label').textContent = '❌ ' + file.name;
+    if (!extracted['xl/worksheets/sheet1.xml']) {
+      /* Some workbooks store the sheet under a different name.
+         Give a helpful error rather than a cryptic one.          */
+      throw new Error(
+        'Could not find xl/worksheets/sheet1.xml inside the ZIP.\n' +
+        'Make sure the file is a standard .xlsx (not .xlsb or .xls).\n' +
+        'If your data is on sheet 2 or later, open the file in Excel,\n' +
+        'move your sheet to be the first tab, and re-save.'
+      );
     }
-  };
-  r.onerror = () => { setStatus('❌ Could not read file', 'error'); };
-  r.readAsArrayBuffer(file);
+
+    log('Parsing sheet1.xml with DOMParser…');
+    const parser   = new DOMParser();
+    const sheetDoc = parser.parseFromString(extracted['xl/worksheets/sheet1.xml'], 'text/xml');
+
+    // Check for XML parse errors
+    const parseErr = sheetDoc.querySelector('parsererror');
+    if (parseErr) throw new Error('XML parse error in sheet1.xml: ' + parseErr.textContent.slice(0,120));
+
+    let ssDoc = null;
+    if (extracted['xl/sharedStrings.xml']) {
+      log('Parsing sharedStrings.xml…');
+      ssDoc = parser.parseFromString(extracted['xl/sharedStrings.xml'], 'text/xml');
+    } else {
+      log('No sharedStrings.xml (file uses no shared strings — OK)');
+    }
+
+    const cellCount = sheetDoc.getElementsByTagName('c').length;
+    log('Cells found in sheet: ' + cellCount);
+    if (cellCount === 0) throw new Error('Sheet appears to be empty — no <c> elements found in XML.');
+
+    /* Store in slot */
+    const s    = slots[activeSlot - 1];
+    s.sheetDoc = sheetDoc;
+    s.ssDoc    = ssDoc;
+    s.fileName = file.name;
+    s.results  = null;
+
+    document.getElementById('upload-label').textContent = '✅ ' + file.name;
+    document.getElementById('btn-start').disabled = false;
+    setStatus('File ready — press ▶ Start to extract', 'warn');
+    updateSlotDot(activeSlot);
+
+  } catch (err) {
+    setStatus('❌ ' + err.message, 'error');
+    log('ERROR: ' + err.message);
+    showDebugBtn();
+    document.getElementById('upload-label').textContent = '❌ ' + file.name;
+  }
 }
 
 /* =============================================================
@@ -701,39 +944,42 @@ function handleFileSelect(file) {
    ============================================================= */
 function startExtract() {
   const s = slots[activeSlot - 1];
-  if (!s.wb) return;
+  if (!s.sheetDoc) return;
 
-  // Grab latest col map from UI before extracting
   s.colMap = readColMapFromUI();
-
-  const ws = s.wb.Sheets[s.wb.SheetNames[0]];
   debugLines = [];
-  log('--- Extract for memo ' + activeSlot + ' ---');
+  log('--- Extract · memo ' + activeSlot + ' ---');
 
-  const results = {};
   const KPI_KEYS = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  const results  = {};
+
   KPI_KEYS.forEach(key => {
-    if (key === 'ob') { results[key] = null; return; }
-    log('\n[' + key.toUpperCase() + '] col="' + s.colMap[key] + '"');
-    const vals = getColValues(ws, s.colMap[key]);
-    results[key] = avg(vals);
-    log('  → result = ' + (results[key] !== null ? results[key] : 'no data'));
+    if (key === 'ob') { results[key] = null; return; } // OB% is left blank by design
+
+    const col = s.colMap[key];
+    log('\n[' + key.toUpperCase() + '] col="' + col + '"');
+
+    if (!col) {
+      results[key] = null;
+      log('  skipped (no column configured)');
+      return;
+    }
+
+    const kpiType  = s.targets[key].type;
+    results[key]   = extractColValue(s.sheetDoc, s.ssDoc, col, kpiType);
+    log('  → final = ' + (results[key] !== null ? results[key] : 'no data'));
   });
 
   s.results   = results;
-  s.sheetName = s.wb.SheetNames[0];
-
   renderResults(results, s.targets);
 
   const anyResult = Object.values(results).some(v => v !== null);
   if (!anyResult) {
     setStatus('⚠️ No numeric data found.\nCheck column letters match your sheet.', 'warn');
-    showDebugBtn();
   } else {
-    setStatus('✅ Sheet: "' + s.sheetName + '" · memo ' + activeSlot, 'ok');
-    showDebugBtn();
+    setStatus('✅ Extracted from "' + s.fileName + '" · memo ' + activeSlot, 'ok');
   }
-
+  showDebugBtn();
   updateSlotDot(activeSlot);
 }
 
@@ -762,11 +1008,11 @@ function clearSlot() {
 }
 
 /* =============================================================
-   TARGETS
+   TARGETS  (editable inline)
    ============================================================= */
 function editTarget(td, key) {
   if (td.querySelector('input')) return;
-  const s = slots[activeSlot - 1];
+  const s   = slots[activeSlot - 1];
   const cur = td.textContent.trim();
   td.textContent = '';
   const inp = document.createElement('input');
@@ -779,7 +1025,6 @@ function editTarget(td, key) {
     td.textContent = val;
     parseTarget(s.targets, key, val);
     s.targets[key].display = val;
-    // Re-render results with new target if we have data
     if (s.results) renderResults(s.results, s.targets);
   }
   inp.addEventListener('blur', commit);
@@ -787,12 +1032,12 @@ function editTarget(td, key) {
 }
 
 function parseTarget(targets, key, str) {
-  const t = targets[key];
+  const t   = targets[key];
   const num = parseFloat(str.replace(/[£%,\s]/g, ''));
   if (isNaN(num)) return;
-  if (str.includes('%'))      { t.raw = num / 100; t.type = 'pct'; }
-  else if (str.includes('£')) { t.raw = num;       t.type = 'gbp'; }
-  else                        { t.raw = num;       t.type = 'num'; }
+  if (str.includes('%'))       { t.raw = num / 100; t.type = 'pct'; }
+  else if (str.includes('£'))  { t.raw = num;       t.type = 'gbp'; }
+  else                         { t.raw = num;        t.type = 'num'; }
 }
 
 /* =============================================================
@@ -809,205 +1054,101 @@ function fmtVal(key, val, t) {
   if (val === null) return '—';
   if (t.type === 'pct') return (val * 100).toFixed(1) + '%';
   if (t.type === 'gbp') return '£' + val.toFixed(2);
-  if (key === 'aht') { const m = Math.floor(val/60), s2 = Math.round(val%60); return m + ':' + String(s2).padStart(2,'0'); }
+  if (key === 'aht') {
+    const m  = Math.floor(val / 60);
+    const s2 = Math.round(val % 60);
+    return m + ':' + String(s2).padStart(2, '0');
+  }
   return Math.round(val).toLocaleString();
 }
 
 /* =============================================================
-   EXCEL HELPERS
-   ============================================================= */
-function colIndex(letters) {
-  if (!letters) return -1;
-  letters = letters.toUpperCase().trim();
-  let n = 0;
-  for (let i = 0; i < letters.length; i++) n = n * 26 + (letters.charCodeAt(i) - 64);
-  return n - 1;
-}
-
-function cellToNumber(cell) {
-  if (!cell) return null;
-  if (typeof cell.v === 'number' && !isNaN(cell.v)) return cell.v;
-  if (typeof cell.v === 'boolean') return cell.v ? 1 : 0;
-  if (typeof cell.v === 'string') {
-    const cleaned = cell.v.replace(/[£%,\s]/g, '').trim();
-    const num = parseFloat(cleaned);
-    if (!isNaN(num)) return cell.v.includes('%') ? num / 100 : num;
-  }
-  if (cell.w) {
-    const cleaned = cell.w.replace(/[£%,\s]/g, '').trim();
-    const num = parseFloat(cleaned);
-    if (!isNaN(num)) return cell.w.includes('%') ? num / 100 : num;
-  }
-  return null;
-}
-
-function findTotalRow(ws) {
-  if (!ws['!ref']) return -1;
-  const range = XLSX.utils.decode_range(ws['!ref']);
-  for (let r = 0; r <= range.e.r; r++) {
-    const cell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
-    if (cell && typeof cell.v === 'string' && cell.v.trim().toLowerCase() === 'total') {
-      log('  Total row found at index ' + r + ' (Excel row ' + (r + 1) + ')');
-      return r;
-    }
-  }
-  return -1;
-}
-
-function getColValues(ws, col) {
-  if (!col || !col.trim()) return [];
-  col = col.toUpperCase().trim();
-  if (!ws['!ref']) rebuildRef(ws);
-  if (!ws['!ref']) { log('  ⚠ No !ref even after rebuild'); return []; }
-  const range = XLSX.utils.decode_range(ws['!ref']);
-  const ci = colIndex(col);
-  if (ci < 0) { log('  ⚠ Invalid column letter: ' + col); return []; }
-  // Do NOT reject based on range.e.c — read-only files often report wrong range
-  log('  Col ' + col + ' (index ' + ci + '), sheet range: ' + ws['!ref']);
-
-  // Strategy 1: find the "Total" row by looking at column A
-  const totalRow = findTotalRow(ws);
-  if (totalRow >= 0) {
-    const v = cellToNumber(ws[XLSX.utils.encode_cell({ r: totalRow, c: ci })]);
-    if (v !== null) {
-      log('  Col ' + col + ': Total row value = ' + (v.toFixed ? v.toFixed(3) : v));
-      return [v];
-    }
-    log('  Col ' + col + ': Total row found but cell empty, falling back to last value');
-  } else {
-    log('  Col ' + col + ': No Total row in col A, falling back to last value');
-  }
-
-  // Strategy 2 (fallback): last non-null numeric value after row index 2
-  const DATA_START_ROW = 2;
-  let lastVal = null, lastRow = -1;
-  for (let r = DATA_START_ROW; r <= range.e.r; r++) {
-    const v = cellToNumber(ws[XLSX.utils.encode_cell({ r, c: ci })]);
-    if (v !== null) { lastVal = v; lastRow = r; }
-  }
-  if (lastVal !== null) {
-    log('  Col ' + col + ': fallback last value at row ' + lastRow + ' = ' + (lastVal.toFixed ? lastVal.toFixed(3) : lastVal));
-    return [lastVal];
-  }
-  log('  Col ' + col + ': no numeric data found');
-  return [];
-}
-
-function avg(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null; }
-
-function rebuildRef(ws) {
-  let minR=Infinity,maxR=-Infinity,minC=Infinity,maxC=-Infinity;
-  Object.keys(ws).forEach(k => {
-    if (k.startsWith('!')) return;
-    const d = XLSX.utils.decode_cell(k);
-    if (d.r<minR) minR=d.r; if (d.r>maxR) maxR=d.r;
-    if (d.c<minC) minC=d.c; if (d.c>maxC) maxC=d.c;
-  });
-  if (maxR >= 0) ws['!ref'] = XLSX.utils.encode_range({s:{r:minR,c:minC},e:{r:maxR,c:maxC}});
-}
-
-/* =============================================================
-   STATUS / DEBUG
-   ============================================================= */
-let debugLines = [];
-let debugVisible = false;
-
-function log(msg) {
-  debugLines.push(msg);
-  document.getElementById('debug-panel').textContent = debugLines.join('\n');
-}
-function setStatus(msg, cls) {
-  const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = cls || '';
-}
-function showDebugBtn() {
-  document.getElementById('debug-toggle').style.display = 'block';
-}
-function toggleDebug() {
-  debugVisible = !debugVisible;
-  document.getElementById('debug-panel').classList.toggle('visible', debugVisible);
-  document.getElementById('debug-toggle').textContent = debugVisible ? '🔍 Hide debug info' : '🔍 Show debug info';
-}
-
-/* =============================================================
-   COPY
+   COPY  (plain text + HTML table for rich paste into Outlook/Teams)
    ============================================================= */
 function buildHtmlTable() {
-  const headers = ['KPI','FCR','AHT','Transfers','OB%','NBA Presentation',"Free SOC's",'CPC'];
-  const tKeys   = ['fcr','aht','trans','ob','nba','soc','cpc'];
-  const s       = slots[activeSlot - 1];
-  const month   = document.getElementById('month-inp').value || 'Result';
-  const agent   = document.getElementById('agent-name').value.trim();
+  const headers  = ['KPI','FCR','AHT','Transfers','OB%','NBA Presentation',"Free SOC's",'CPC'];
+  const tKeys    = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  const s        = slots[activeSlot - 1];
+  const month    = document.getElementById('month-inp').value || 'Result';
+  const agent    = document.getElementById('agent-name').value.trim();
 
   const tData = tKeys.map(k => ({ val: s.targets[k].display }));
   const rData = tKeys.map(k => {
-    const el  = document.getElementById('r-' + k);
-    const cls = el.className;
+    const el    = document.getElementById('r-' + k);
+    const cls   = el.className;
     const bg    = cls==='good'?'#d1fae5':cls==='warn'?'#fef3c7':cls==='bad'?'#fee2e2':cls==='blank'?'#f1f5f9':'#f8fafc';
     const color = cls==='good'?'#065f46':cls==='warn'?'#92400e':cls==='bad'?'#991b1b':cls==='blank'?'#94a3b8':'#475569';
     return { val: el.textContent.trim(), bg, color };
   });
 
-  const tableS  = 'border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;background:#ffffff;width:100%;';
-  const agentS  = 'background:#f1f5f9;color:#334155;font-size:13px;padding:10px 12px;border:1px solid #e2e8f0;font-weight:600;';
-  const thS     = 'background:#1e293b;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:10px 12px;text-align:center;border:1px solid #334155;white-space:nowrap;';
-  const th1S    = thS + 'text-align:left;';
-  const tdLblS  = 'background:#334155;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;padding:10px 12px;text-align:left;border:1px solid #475569;white-space:nowrap;';
-  const tdTgtS  = 'background:#f8fafc;color:#64748b;font-size:13px;font-weight:600;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;';
+  const tableS = 'border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;background:#ffffff;width:100%;';
+  const agentS = 'background:#f1f5f9;color:#334155;font-size:13px;padding:10px 12px;border:1px solid #e2e8f0;font-weight:600;';
+  const thS    = 'background:#1e293b;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:10px 12px;text-align:center;border:1px solid #334155;white-space:nowrap;';
+  const th1S   = thS + 'text-align:left;';
+  const tdLblS = 'background:#334155;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;padding:10px 12px;text-align:left;border:1px solid #475569;white-space:nowrap;';
+  const tdTgtS = 'background:#f8fafc;color:#64748b;font-size:13px;font-weight:600;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;';
 
-  let html = '<table style="'+tableS+'">';
-  if (agent) html += '<tr><td colspan="8" style="'+agentS+'">&#128100; Agent: <span style="color:#0f172a;font-size:14px;">'+agent+'</span></td></tr>';
-  html += '<tr><th style="'+th1S+'">KPI</th>';
-  headers.slice(1).forEach(h => { html += '<th style="'+thS+'">'+h+'</th>'; });
-  html += '</tr><tr><td style="'+tdLblS+'">Target</td>';
-  tData.forEach(d => { html += '<td style="'+tdTgtS+'">'+d.val+'</td>'; });
-  html += '</tr><tr><td style="'+tdLblS+'">'+month+'</td>';
+  let html = '<table style="' + tableS + '">';
+  if (agent) html += '<tr><td colspan="8" style="' + agentS + '">&#128100; Agent: <span style="color:#0f172a;font-size:14px;">' + agent + '</span></td></tr>';
+  html += '<tr><th style="' + th1S + '">KPI</th>';
+  headers.slice(1).forEach(h => { html += '<th style="' + thS + '">' + h + '</th>'; });
+  html += '</tr><tr><td style="' + tdLblS + '">Target</td>';
+  tData.forEach(d => { html += '<td style="' + tdTgtS + '">' + d.val + '</td>'; });
+  html += '</tr><tr><td style="' + tdLblS + '">' + month + '</td>';
   rData.forEach(d => {
-    html += '<td style="background:'+d.bg+';color:'+d.color+';font-size:15px;font-weight:800;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;">'+d.val+'</td>';
+    html += '<td style="background:' + d.bg + ';color:' + d.color + ';font-size:15px;font-weight:800;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;">' + d.val + '</td>';
   });
   html += '</tr></table>';
   return html;
 }
 
 function copyTable() {
-  const tKeys = ['fcr','aht','trans','ob','nba','soc','cpc'];
-  const s     = slots[activeSlot - 1];
-  const month = document.getElementById('month-inp').value || 'Result';
-  const agent = document.getElementById('agent-name').value.trim();
+  const tKeys   = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  const s       = slots[activeSlot - 1];
+  const month   = document.getElementById('month-inp').value || 'Result';
+  const agent   = document.getElementById('agent-name').value.trim();
   const headers = ['KPI','FCR','AHT','Transfers','OB%','NBA Presentation',"Free SOC's",'CPC'];
-  const tVals = ['Target', ...tKeys.map(k => s.targets[k].display)];
-  const rVals = [month,    ...tKeys.map(k => document.getElementById('r-'+k).textContent.trim())];
-  const plain = (agent ? 'Agent: '+agent+'\n' : '') + [headers,tVals,rVals].map(r=>r.join('\t')).join('\n');
-  const html  = buildHtmlTable();
+  const tVals   = ['Target', ...tKeys.map(k => s.targets[k].display)];
+  const rVals   = [month,    ...tKeys.map(k => document.getElementById('r-'+k).textContent.trim())];
+  const plain   = (agent ? 'Agent: ' + agent + '\n' : '') + [headers, tVals, rVals].map(r => r.join('\t')).join('\n');
+  const html    = buildHtmlTable();
 
   const btn  = document.querySelector('.btn-copy');
-  const done = () => { btn.textContent='✓ Copied!'; setTimeout(()=>btn.textContent='Copy',2200); };
+  const done = () => { btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = 'Copy', 2200); };
+
   const container = document.createElement('div');
-  container.contentEditable='true';
-  container.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;';
+  container.contentEditable = 'true';
+  container.style.cssText   = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;';
   container.innerHTML = html;
   document.body.appendChild(container);
 
   if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
     navigator.clipboard.write([new ClipboardItem({
-      'text/html':  new Blob([html],  {type:'text/html'}),
-      'text/plain': new Blob([plain], {type:'text/plain'}),
-    })]).then(()=>{ document.body.removeChild(container); done(); })
-       .catch(()=>execCopy(container, plain, done));
+      'text/html':  new Blob([html],  { type: 'text/html' }),
+      'text/plain': new Blob([plain], { type: 'text/plain' }),
+    })]).then(() => { document.body.removeChild(container); done(); })
+       .catch(() => execCopy(container, plain, done));
   } else {
     execCopy(container, plain, done);
   }
 }
 
 function execCopy(container, plain, done) {
-  const sel=window.getSelection(), range=document.createRange();
-  range.selectNodeContents(container); sel.removeAllRanges(); sel.addRange(range);
-  try { document.execCommand('copy'); }
-  catch(e) {
-    const ta=document.createElement('textarea');
-    ta.value=plain; ta.style.cssText='position:fixed;left:-9999px;top:0;';
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  const sel   = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(container);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  try {
+    document.execCommand('copy');
+  } catch(e) {
+    const ta = document.createElement('textarea');
+    ta.value = plain;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
   }
   sel.removeAllRanges();
   if (container.parentNode) document.body.removeChild(container);

@@ -654,6 +654,8 @@ function handleFileSelect(file) {
         cellNF: true,
         cellDates: true,
         sheetStubs: true,
+        dense: false,
+        raw: false,
         password: '',
         WTF: false
       });
@@ -662,8 +664,9 @@ function handleFileSelect(file) {
       log('Active: "' + wb.SheetNames[0] + '"');
 
       const ws = wb.Sheets[wb.SheetNames[0]];
-      log('Ref: ' + (ws['!ref'] || 'MISSING'));
-      if (!ws['!ref']) { rebuildRef(ws); log('Rebuilt ref: ' + ws['!ref']); }
+      log('Ref before rebuild: ' + (ws['!ref'] || 'MISSING'));
+      rebuildRef(ws);
+      log('Ref after rebuild: ' + (ws['!ref'] || 'STILL MISSING'));
 
       // Store workbook in slot
       const s = slots[activeSlot - 1];
@@ -848,10 +851,13 @@ function findTotalRow(ws) {
 function getColValues(ws, col) {
   if (!col || !col.trim()) return [];
   col = col.toUpperCase().trim();
-  if (!ws['!ref']) { log('  ⚠ No !ref'); return []; }
+  if (!ws['!ref']) rebuildRef(ws);
+  if (!ws['!ref']) { log('  ⚠ No !ref even after rebuild'); return []; }
   const range = XLSX.utils.decode_range(ws['!ref']);
   const ci = colIndex(col);
-  if (ci < 0 || ci > range.e.c) { log('  ⚠ Column ' + col + ' out of range'); return []; }
+  if (ci < 0) { log('  ⚠ Invalid column letter: ' + col); return []; }
+  // Do NOT reject based on range.e.c — read-only files often report wrong range
+  log('  Col ' + col + ' (index ' + ci + '), sheet range: ' + ws['!ref']);
 
   // Strategy 1: find the "Total" row by looking at column A
   const totalRow = findTotalRow(ws);

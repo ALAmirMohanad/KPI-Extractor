@@ -7,34 +7,38 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
-  --bg:          #1a1a2e;
-  --panel:       #16213e;
-  --card:        #0f172a;
-  --input-bg:    #1e293b;
-  --border:      #2d3748;
-  --text:        #e2e8f0;
-  --text-muted:  #94a3b8;
-  --text-dim:    #64748b;
-  --label:       #cbd5e1;
-  --title:       #ffffff;
-  --slot-bg:     #1e293b;
-  --slot-active: #3b82f6;
-  --btn-copy:    #3b82f6;
-  --btn-clear:   #e53e3e;
+  --bg:        #1a1a2e;
+  --panel:     #16213e;
+  --card:      #0f172a;
+  --input-bg:  #1e293b;
+  --border:    #2d3748;
+  --text:      #e2e8f0;
+  --text-muted:#94a3b8;
+  --text-dim:  #64748b;
+  --label:     #cbd5e1;
+  --title:     #ffffff;
+  --slot-bg:   #1e293b;
+  --slot-active:#3b82f6;
+  --btn-copy:  #3b82f6;
+  --btn-clear: #e53e3e;
+  --btn-back:  #276749;
+  --btn-fwd:   #6b21a8;
+  --badge-4pt: #22c55e;
+  --sun:       #fbbf24;
 }
 .light {
-  --bg:          #e8eaf0;
-  --panel:       #f1f3f7;
-  --card:        #ffffff;
-  --input-bg:    #f8f9fc;
-  --border:      #c9cdd6;
-  --text:        #1a202c;
-  --text-muted:  #4a5568;
-  --text-dim:    #718096;
-  --label:       #2d3748;
-  --title:       #1a202c;
-  --slot-bg:     #dde1ea;
-  --slot-active: #3b82f6;
+  --bg:        #e8eaf0;
+  --panel:     #f1f3f7;
+  --card:      #ffffff;
+  --input-bg:  #f8f9fc;
+  --border:    #c9cdd6;
+  --text:      #1a202c;
+  --text-muted:#4a5568;
+  --text-dim:  #718096;
+  --label:     #2d3748;
+  --title:     #1a202c;
+  --slot-bg:   #dde1ea;
+  --slot-active:#3b82f6;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -54,10 +58,10 @@ body {
   gap: 10px;
   align-items: flex-start;
   width: 100%;
-  max-width: 780px;
+  max-width: 760px;
 }
 
-/* Slots */
+/* Left sidebar slots */
 .slots {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -83,7 +87,7 @@ body {
 .slot:hover { background: var(--border); }
 .slot.active { background: var(--slot-active); color: #fff; border-color: var(--slot-active); }
 
-/* Panel */
+/* Main panel */
 .panel {
   flex: 1;
   background: var(--panel);
@@ -100,6 +104,16 @@ body {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
+}
+.badge-4pt {
+  background: var(--badge-4pt);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .panel-title {
   font-size: 18px;
@@ -129,7 +143,9 @@ body {
   margin-bottom: 5px;
 }
 .field input[type=text],
-.field select {
+.field input[type=number],
+.field select,
+.field textarea {
   width: 100%;
   background: var(--input-bg);
   border: 1px solid var(--border);
@@ -141,10 +157,30 @@ body {
   font-family: inherit;
   transition: border-color 0.15s;
 }
-.field input[type=text]:focus,
-.field select:focus { border-color: var(--slot-active); }
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--slot-active);
+}
+.field textarea { resize: vertical; min-height: 60px; }
 .field select { cursor: pointer; }
-.field select option { background: var(--input-bg); color: var(--text); }
+
+/* Row with inline button */
+.field-row { display: flex; gap: 8px; align-items: flex-end; }
+.field-row .field { flex: 1; }
+.prev-btn {
+  background: #e53e3e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  height: 36px;
+}
 
 /* Upload zone */
 .upload-zone {
@@ -171,9 +207,23 @@ details.col-map {
   border-radius: 7px;
   padding: 8px 12px;
 }
-details.col-map summary { font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none; }
-details.col-map table { width: 100%; font-size: 12px; border-collapse: collapse; margin-top: 8px; }
-details.col-map td, details.col-map th { padding: 4px 8px; border-bottom: 0.5px solid var(--border); color: var(--text-muted); }
+details.col-map summary {
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+details.col-map table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+details.col-map td, details.col-map th {
+  padding: 4px 8px;
+  border-bottom: 0.5px solid var(--border);
+  color: var(--text-muted);
+}
 details.col-map th { font-weight: 700; color: var(--text-dim); }
 details.col-map input[type=text] {
   width: 52px; padding: 3px 6px; font-size: 12px;
@@ -192,9 +242,16 @@ details.col-map input[type=text] {
 #status { font-size: 11px; color: var(--text-dim); min-height: 15px; }
 
 /* KPI Table */
-.kpi-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
-table.kpi { width: 100%; border-collapse: collapse; min-width: 560px; }
-
+.kpi-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+table.kpi {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
 table.kpi thead th {
   background: var(--card);
   color: var(--text-dim);
@@ -210,14 +267,14 @@ table.kpi thead th {
 }
 table.kpi thead th:first-child { text-align: left; padding-left: 12px; width: 80px; }
 table.kpi thead th:last-child { border-right: none; }
-
 table.kpi tbody td {
-  padding: 6px 8px;
+  padding: 9px 8px;
   text-align: center;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   border-right: 1px solid var(--bg);
   border-bottom: 1px solid var(--bg);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 table.kpi tbody td:first-child {
@@ -231,7 +288,6 @@ table.kpi tbody td:first-child {
 table.kpi tbody td:last-child { border-right: none; }
 table.kpi tbody tr:last-child td { border-bottom: none; }
 
-/* Target row */
 tr.t-row td { background: var(--input-bg); font-size: 12px; font-weight: 600; color: var(--text-muted); }
 tr.t-row td.editable { cursor: pointer; }
 tr.t-row td.editable:hover { filter: brightness(1.2); }
@@ -239,51 +295,36 @@ tr.t-row td input.t-inp {
   width: 100%; background: transparent; border: none;
   border-bottom: 1px solid var(--slot-active);
   color: var(--text); font-size: 12px; font-weight: 600;
-  text-align: center; outline: none; padding: 2px 0; font-family: inherit;
+  text-align: center; outline: none; padding: 2px 0;
 }
+tr.r-row td { background: var(--card); font-size: 16px; font-weight: 800; }
 
-/* Result row — all cells editable */
-tr.r-row td { background: var(--card); font-size: 15px; font-weight: 800; }
-tr.r-row td.editable-result { cursor: pointer; position: relative; }
-tr.r-row td.editable-result:hover::after {
-  content: '✎';
-  position: absolute;
-  top: 2px; right: 3px;
-  font-size: 9px;
-  color: var(--text-dim);
-  opacity: 0.7;
-}
-tr.r-row td input.r-inp {
-  width: 100%; background: transparent; border: none;
-  border-bottom: 1px solid var(--slot-active);
-  color: inherit; font-size: 14px; font-weight: 800;
-  text-align: center; outline: none; padding: 2px 0; font-family: inherit;
-}
-
-/* Color states */
 td.good  { background: #052e16 !important; color: #4ade80 !important; }
 td.warn  { background: #431407 !important; color: #fbbf24 !important; }
 td.bad   { background: #3b0007 !important; color: #f87171 !important; }
 td.neu   { background: var(--card) !important; color: var(--text-dim) !important; }
-td.blank { background: var(--input-bg) !important; color: var(--text-dim) !important; font-size: 11px !important; }
+td.blank { background: var(--input-bg) !important; color: var(--border) !important; font-size: 11px !important; font-weight: 500 !important; }
 
-.light td.good { background: #dcfce7 !important; color: #15803d !important; }
-.light td.warn { background: #fef9c3 !important; color: #a16207 !important; }
-.light td.bad  { background: #fee2e2 !important; color: #b91c1c !important; }
+.light td.good  { background: #dcfce7 !important; color: #15803d !important; }
+.light td.warn  { background: #fef9c3 !important; color: #a16207 !important; }
+.light td.bad   { background: #fee2e2 !important; color: #b91c1c !important; }
 
-/* Month select */
-#month-sel {
+/* Month input */
+#month-inp {
   background: transparent; border: none;
   border-bottom: 1px dashed var(--border);
   color: var(--text-dim); font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.05em;
-  outline: none; cursor: pointer; font-family: inherit;
-  padding: 1px 2px; max-width: 72px;
+  width: 68px; outline: none; cursor: pointer; font-family: inherit;
 }
-#month-sel option { background: var(--input-bg); color: var(--text); text-transform: capitalize; font-size: 12px; }
 
-/* Actions */
-.actions { display: flex; gap: 8px; align-items: center; }
+/* Bottom action bar */
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
 .btn {
   border: none; border-radius: 7px;
   font-size: 13px; font-weight: 700;
@@ -291,27 +332,27 @@ td.blank { background: var(--input-bg) !important; color: var(--text-dim) !impor
   text-transform: uppercase; letter-spacing: 0.04em;
   transition: filter 0.15s;
 }
-.btn:hover  { filter: brightness(1.15); }
-.btn:active { filter: brightness(0.9);  }
-.btn-copy-main { background: var(--btn-copy); color: #fff; flex: 2; min-width: 100px; }
+.btn:hover { filter: brightness(1.15); }
+.btn:active { filter: brightness(0.9); }
+.btn-copy-main { background: var(--btn-copy); color: #fff; flex: 2; min-width: 120px; }
 .btn-clear     { background: var(--btn-clear); color: #fff; flex: 2; min-width: 100px; }
-.btn-icon      { background: var(--card); color: var(--text-muted); border: 1px solid var(--border); width: 42px; padding: 0; height: 40px; font-size: 16px; flex-shrink: 0; border-radius: 7px; cursor: pointer; }
-.btn-icon:hover { filter: brightness(1.2); }
-
-footer { font-size: 11px; color: var(--text-dim); text-align: center; padding-top: 4px; }
+.btn-icon      { background: var(--card); color: var(--text-muted); border: 1px solid var(--border); width: 42px; padding: 0; height: 40px; font-size: 16px; flex-shrink: 0; }
+.btn-back      { background: var(--btn-back); color: #fff; width: 42px; padding: 0; height: 40px; font-size: 16px; flex-shrink: 0; }
+.btn-fwd       { background: var(--btn-fwd);  color: #fff; width: 42px; padding: 0; height: 40px; font-size: 16px; flex-shrink: 0; }
 </style>
 </head>
 <body>
 <div class="outer">
 
-  <!-- Slots -->
+  <!-- Left slots -->
   <div class="slots" id="slots"></div>
 
-  <!-- Panel -->
-  <div class="panel">
+  <!-- Main panel -->
+  <div class="panel" id="main-panel">
 
+    <!-- Header -->
     <div class="panel-header">
-      <span style="width:30px"></span>
+      <span class="badge-4pt">4 point memo</span>
       <span class="panel-title">KPI Extractor</span>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">🌙</button>
     </div>
@@ -346,7 +387,7 @@ footer { font-size: 11px; color: var(--text-dim); text-align: center; padding-to
           <tr><td>FCR</td>              <td><input id="c-fcr"   type="text" value="E"></td>  <td>average → %</td></tr>
           <tr><td>AHT</td>              <td><input id="c-aht"   type="text" value="AR"></td> <td>average → sec</td></tr>
           <tr><td>Transfers</td>        <td><input id="c-trans" type="text" value="BB"></td> <td>average → %</td></tr>
-          <tr><td>OB%</td>              <td><input id="c-ob"    type="text" value=""></td>   <td>manual entry</td></tr>
+          <tr><td>OB%</td>              <td><input id="c-ob"    type="text" value=""></td>   <td>leave blank</td></tr>
           <tr><td>NBA Presentation</td> <td><input id="c-nba"   type="text" value="FL"></td> <td>average → %</td></tr>
           <tr><td>Free SOC's</td>       <td><input id="c-soc"   type="text" value="DI"></td> <td>average → %</td></tr>
           <tr><td>CPC</td>              <td><input id="c-cpc"   type="text" value="DK"></td> <td>average → £</td></tr>
@@ -354,13 +395,15 @@ footer { font-size: 11px; color: var(--text-dim); text-align: center; padding-to
         <button class="apply-btn" onclick="recompute()">Apply & recalculate</button>
       </details>
 
+      <!-- Status -->
       <div id="status"></div>
 
-      <!-- KPI Table -->
+      <!-- Targets -->
       <div class="field">
-        <label>Results : <span style="font-size:11px;font-weight:400;color:var(--text-dim)">Click any result cell to edit manually</span></label>
+        <label>Targets : <span style="font-size:11px;font-weight:400;color:var(--text-dim)">(click a value to edit)</span></label>
       </div>
 
+      <!-- KPI Table -->
       <div class="kpi-wrap">
         <table class="kpi" id="kpi-table">
           <thead>
@@ -378,7 +421,7 @@ footer { font-size: 11px; color: var(--text-dim); text-align: center; padding-to
           <tbody>
             <tr class="t-row">
               <td>Target</td>
-              <td class="editable" onclick="editTarget(this,'fcr')"   id="t-fcr">80%</td>
+              <td class="editable" onclick="editTarget(this,'fcr')"   id="t-fcr">78.7%</td>
               <td class="editable" onclick="editTarget(this,'aht')"   id="t-aht">900</td>
               <td class="editable" onclick="editTarget(this,'trans')" id="t-trans">7%</td>
               <td class="editable" onclick="editTarget(this,'ob')"    id="t-ob">12%</td>
@@ -387,62 +430,52 @@ footer { font-size: 11px; color: var(--text-dim); text-align: center; padding-to
               <td class="editable" onclick="editTarget(this,'cpc')"   id="t-cpc">£0.37</td>
             </tr>
             <tr class="r-row">
-              <td>
-                <select id="month-sel" onchange="updateMonthDisplay()">
-                  <option value="January">Jan</option>
-                  <option value="February">Feb</option>
-                  <option value="March">Mar</option>
-                  <option value="April" selected>Apr</option>
-                  <option value="May">May</option>
-                  <option value="June">Jun</option>
-                  <option value="July">Jul</option>
-                  <option value="August">Aug</option>
-                  <option value="September">Sep</option>
-                  <option value="October">Oct</option>
-                  <option value="November">Nov</option>
-                  <option value="December">Dec</option>
-                </select>
-              </td>
-              <td class="neu editable-result" id="r-fcr"   onclick="editResult(this,'fcr')">—</td>
-              <td class="neu editable-result" id="r-aht"   onclick="editResult(this,'aht')">—</td>
-              <td class="neu editable-result" id="r-trans" onclick="editResult(this,'trans')">—</td>
-              <td class="blank editable-result" id="r-ob"  onclick="editResult(this,'ob')">—</td>
-              <td class="neu editable-result" id="r-nba"   onclick="editResult(this,'nba')">—</td>
-              <td class="neu editable-result" id="r-soc"   onclick="editResult(this,'soc')">—</td>
-              <td class="neu editable-result" id="r-cpc"   onclick="editResult(this,'cpc')">—</td>
+              <td><input id="month-inp" type="text" value="April" title="Click to rename"></td>
+              <td class="neu" id="r-fcr">—</td>
+              <td class="neu" id="r-aht">—</td>
+              <td class="neu" id="r-trans">—</td>
+              <td class="blank" id="r-ob">N/A</td>
+              <td class="neu" id="r-nba">—</td>
+              <td class="neu" id="r-soc">—</td>
+              <td class="neu" id="r-cpc">—</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Actions -->
+      <!-- Action bar -->
       <div class="actions">
         <button class="btn btn-copy-main" onclick="copyTable()">Copy</button>
         <button class="btn btn-clear"     onclick="clearAll()">Clear</button>
-        <button class="btn-icon"          onclick="clearAll()" title="Delete">🗑️</button>
+        <button class="btn btn-icon"      onclick="clearAll()" title="Delete">🗑️</button>
+        <button class="btn btn-back"      onclick="prevSlot()" title="Previous">↩</button>
+        <button class="btn btn-fwd"       onclick="nextSlot()" title="Next">↪</button>
       </div>
 
-      <footer>All processing is local — your file never leaves your device.</footer>
-
-    </div>
-  </div>
-</div>
+    </div><!-- /panel-body -->
+  </div><!-- /panel -->
+</div><!-- /outer -->
 
 <script>
 /* ---- Slots ---- */
 let activeSlot = 1;
+const TOTAL_SLOTS = 30;
 const slotsEl = document.getElementById('slots');
-for (let i = 1; i <= 30; i++) {
+for (let i = 1; i <= TOTAL_SLOTS; i++) {
   const d = document.createElement('div');
   d.className = 'slot' + (i === 1 ? ' active' : '');
   d.textContent = i;
   d.dataset.slot = i;
-  d.addEventListener('click', () => {
-    activeSlot = i;
-    document.querySelectorAll('.slot').forEach(s => s.classList.toggle('active', +s.dataset.slot === i));
-  });
+  d.addEventListener('click', () => activateSlot(i));
   slotsEl.appendChild(d);
 }
+function activateSlot(n) {
+  activeSlot = n;
+  document.querySelectorAll('.slot').forEach(s => s.classList.toggle('active', +s.dataset.slot === n));
+  document.querySelector('.panel-title').textContent = 'KPI EXTRACTOR';
+}
+function prevSlot() { if (activeSlot > 1) activateSlot(activeSlot - 1); }
+function nextSlot() { if (activeSlot < TOTAL_SLOTS) activateSlot(activeSlot + 1); }
 
 /* ---- Theme ---- */
 let isDark = true;
@@ -452,12 +485,9 @@ function toggleTheme() {
   document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
 }
 
-/* ---- Month ---- */
-function updateMonthDisplay() {}
-
 /* ---- Targets ---- */
 const targets = {
-  fcr:   { raw: 0.80,  type: 'pct', higherBetter: true  },
+  fcr:   { raw: 0.787, type: 'pct', higherBetter: true  },
   aht:   { raw: 900,   type: 'num', higherBetter: false },
   trans: { raw: 0.07,  type: 'pct', higherBetter: false },
   ob:    { raw: 0.12,  type: 'pct', higherBetter: true  },
@@ -475,12 +505,12 @@ function editTarget(td, key) {
   inp.value = cur;
   td.appendChild(inp);
   inp.focus(); inp.select();
-  const commit = () => {
+  function commit() {
     const val = inp.value.trim() || cur;
     td.textContent = val;
     parseTarget(key, val);
-    reapplyColors();
-  };
+    recompute();
+  }
   inp.addEventListener('blur', commit);
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
 }
@@ -489,56 +519,9 @@ function parseTarget(key, str) {
   const t = targets[key];
   const num = parseFloat(str.replace(/[£%,\s]/g,''));
   if (isNaN(num)) return;
-  if (str.includes('%'))       { t.raw = num/100; t.type = 'pct'; }
-  else if (str.includes('£'))  { t.raw = num;     t.type = 'gbp'; }
-  else                         { t.raw = num;     t.type = 'num'; }
-}
-
-/* ---- Edit result cells manually ---- */
-function editResult(td, key) {
-  if (td.querySelector('input')) return;
-  const cur = td.textContent.trim();
-  const displayVal = cur === '—' ? '' : cur;
-  td.textContent = '';
-  const inp = document.createElement('input');
-  inp.className = 'r-inp';
-  inp.value = displayVal;
-  inp.placeholder = targets[key].type === 'gbp' ? '£0.00' : targets[key].type === 'pct' ? '0.0%' : '0';
-  td.appendChild(inp);
-  inp.focus(); inp.select();
-  const commit = () => {
-    const val = inp.value.trim();
-    if (!val) {
-      td.textContent = '—';
-      td.className = key === 'ob' ? 'blank editable-result' : 'neu editable-result';
-    } else {
-      td.textContent = val;
-      const parsed = parseResultVal(key, val);
-      const cls = parsed !== null ? colorClass(key, parsed) : 'neu';
-      td.className = cls + ' editable-result';
-    }
-  };
-  inp.addEventListener('blur', commit);
-  inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
-}
-
-function parseResultVal(key, str) {
-  if (!str || str === '—') return null;
-  const clean = str.replace(/[£%,\s]/g,'');
-  const num = parseFloat(clean);
-  if (isNaN(num)) return null;
-  const t = targets[key];
-  if (t.type === 'pct') return str.includes('%') ? num/100 : num > 1 ? num/100 : num;
-  if (t.type === 'gbp') return num;
-  if (key === 'aht') {
-    // support mm:ss or plain seconds
-    if (str.includes(':')) {
-      const parts = str.split(':');
-      return parseInt(parts[0])*60 + parseInt(parts[1]);
-    }
-    return num;
-  }
-  return num;
+  if (str.includes('%'))      { t.raw = num/100; t.type = 'pct'; }
+  else if (str.includes('£')) { t.raw = num;     t.type = 'gbp'; }
+  else                        { t.raw = num;     t.type = 'num'; }
 }
 
 /* ---- Excel helpers ---- */
@@ -569,7 +552,7 @@ function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : nu
 
 function colorClass(key, val) {
   const t = targets[key];
-  if (val === null) return 'neu';
+  if (val === null || key === 'ob') return key==='ob' ? 'blank' : 'neu';
   const r = val / t.raw;
   if (t.higherBetter) { return r>=0.97?'good':r>=0.88?'warn':'bad'; }
   else                { return r<=1.03?'good':r<=1.12?'warn':'bad'; }
@@ -607,153 +590,899 @@ function recompute() {
   if (!wb) return;
   const ws = wb.Sheets[wb.SheetNames[0]];
   const cols = {
-    fcr:   document.getElementById('c-fcr').value,
-    aht:   document.getElementById('c-aht').value,
+    fcr: document.getElementById('c-fcr').value,
+    aht: document.getElementById('c-aht').value,
     trans: document.getElementById('c-trans').value,
-    ob:    document.getElementById('c-ob').value,
-    nba:   document.getElementById('c-nba').value,
-    soc:   document.getElementById('c-soc').value,
-    cpc:   document.getElementById('c-cpc').value,
+    ob: document.getElementById('c-ob').value,
+    nba: document.getElementById('c-nba').value,
+    soc: document.getElementById('c-soc').value,
+    cpc: document.getElementById('c-cpc').value,
   };
   ['fcr','aht','trans','ob','nba','soc','cpc'].forEach(key => {
     const cell = document.getElementById('r-'+key);
-    if (cell.querySelector('input')) return; // skip if being edited
-    if (key === 'ob' && !cols.ob) {
-      // OB has no column — leave as manual
-      cell.textContent = '—';
-      cell.className = 'blank editable-result';
-      return;
-    }
+    if (key==='ob') { cell.textContent='N/A'; cell.className='blank'; return; }
     const val = avg(getColValues(ws, cols[key]));
     cell.textContent = fmtVal(key, val);
-    cell.className = colorClass(key, val) + ' editable-result';
+    cell.className = colorClass(key, val);
   });
-  document.getElementById('status').textContent = 'Sheet: "'+wb.SheetNames[0]+'" · '+new Date().toLocaleTimeString();
-}
-
-function reapplyColors() {
-  ['fcr','aht','trans','ob','nba','soc','cpc'].forEach(key => {
-    const cell = document.getElementById('r-'+key);
-    if (cell.querySelector('input')) return;
-    const txt = cell.textContent.trim();
-    if (txt === '—' || txt === '') return;
-    const val = parseResultVal(key, txt);
-    const cls = val !== null ? colorClass(key, val) : 'neu';
-    cell.className = cls + ' editable-result';
-  });
+  document.getElementById('status').textContent =
+    'Sheet: "'+wb.SheetNames[0]+'" · '+new Date().toLocaleTimeString();
 }
 
 /* ---- Clear ---- */
 function clearAll() {
-  wb = null;
   document.getElementById('agent-name').value = '';
+  wb = null;
   document.getElementById('upload-label').textContent = '📁 Click or drag your Excel file here';
   document.getElementById('fin').value = '';
   document.getElementById('status').textContent = '';
   ['fcr','aht','trans','ob','nba','soc','cpc'].forEach(key => {
     const cell = document.getElementById('r-'+key);
-    cell.textContent = '—';
-    cell.className = (key==='ob' ? 'blank' : 'neu') + ' editable-result';
+    cell.textContent = key==='ob' ? 'N/A' : '—';
+    cell.className   = key==='ob' ? 'blank' : 'neu';
   });
 }
 
-/* ---- Copy — exact format matching the screenshot ---- */
-function copyTable() {
-  const tKeys  = ['fcr','aht','trans','ob','nba','soc','cpc'];
-  const month  = document.getElementById('month-sel').value;
-  const agent  = document.getElementById('agent-name').value.trim();
-
+/* ---- Copy ---- */
+function buildHtmlTable() {
   const headers = ['KPI','FCR','AHT','Transfers','OB%','NBA Presentation',"Free SOC's",'CPC'];
+  const tKeys   = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  const month   = document.getElementById('month-inp').value || 'Result';
+  const agent   = document.getElementById('agent-name').value.trim() || '';
 
-  const tVals = tKeys.map(k => document.getElementById('t-'+k).textContent.trim());
-  const rVals = tKeys.map(k => document.getElementById('r-'+k).textContent.trim());
-
-  // Color mapping for result cells — matching screenshot exactly
-  // Green = good, Orange/Red = bad, Yellow = warn, neutral = no color
-  const rColors = tKeys.map(k => {
-    const cls = document.getElementById('r-'+k).className;
-    if (cls.includes('good'))  return { bg:'#4ade80', fg:'#052e16' }; // green
-    if (cls.includes('warn'))  return { bg:'#fbbf24', fg:'#431407' }; // yellow/amber
-    if (cls.includes('bad'))   return { bg:'#f87171', fg:'#7f1d1d' }; // red
-    return { bg: null, fg: null };
+  const tData = tKeys.map(k => ({ val: document.getElementById('t-'+k).textContent.trim() }));
+  const rData = tKeys.map(k => {
+    const el  = document.getElementById('r-'+k);
+    const cls = el.className;
+    // Light-mode friendly colors for email/paste
+    const bg    = cls==='good' ? '#d1fae5' : cls==='warn' ? '#fef3c7' : cls==='bad' ? '#fee2e2' : cls==='blank' ? '#f1f5f9' : '#f8fafc';
+    const color = cls==='good' ? '#065f46' : cls==='warn' ? '#92400e' : cls==='bad' ? '#991b1b' : cls==='blank' ? '#94a3b8' : '#475569';
+    return { val: el.textContent.trim(), bg, color };
   });
 
-  // --- Build HTML table (exact style like screenshot) ---
-  const tableS = 'border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;';
-  const thBaseS = 'background:#1a1a2e;color:#e2e8f0;font-weight:700;font-size:12px;padding:9px 12px;border:1px solid #374151;text-align:center;white-space:nowrap;';
-  const th1S    = thBaseS + 'text-align:left;';
-  const tdLabelS= 'background:#374151;color:#e2e8f0;font-weight:700;font-size:12px;padding:9px 12px;border:1px solid #4b5563;text-align:left;white-space:nowrap;';
-  const tdTargS = 'background:#1f2937;color:#9ca3af;font-size:13px;font-weight:600;padding:9px 12px;border:1px solid #374151;text-align:center;';
+  // Styles — white background always so it works in any email client
+  const tableS  = 'border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;background:#ffffff;width:100%;';
+  const agentS  = 'background:#f1f5f9;color:#334155;font-size:13px;padding:10px 12px;border:1px solid #e2e8f0;font-weight:600;letter-spacing:0.02em;';
+  const thS     = 'background:#1e293b;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:10px 12px;text-align:center;border:1px solid #334155;white-space:nowrap;';
+  const th1S    = 'background:#1e293b;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:10px 12px;text-align:left;border:1px solid #334155;white-space:nowrap;';
+  const tdLabelS= 'background:#334155;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;padding:10px 12px;text-align:left;border:1px solid #475569;white-space:nowrap;';
+  const tdTargS = 'background:#f8fafc;color:#64748b;font-size:13px;font-weight:600;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;';
 
-  let html = '';
+  let html = '<table style="'+tableS+'">';
 
-  // Agent name row above table
+  // Agent row (only if name entered)
   if (agent) {
-    html += '<p style="font-family:Segoe UI,Arial,sans-serif;font-size:13px;font-weight:600;color:#1f2937;margin:0 0 6px 0;">Agent: '+agent+'</p>';
+    html += '<tr><td colspan="8" style="'+agentS+'">&#128100; Agent: <span style="color:#0f172a;font-size:14px;">'+agent+'</span></td></tr>';
   }
 
-  html += '<table style="'+tableS+'">';
-
-  // Header
+  // Header row
   html += '<tr><th style="'+th1S+'">KPI</th>';
-  headers.slice(1).forEach(h => html += '<th style="'+thBaseS+'">'+h+'</th>');
+  headers.slice(1).forEach(h => { html += '<th style="'+thS+'">'+h+'</th>'; });
   html += '</tr>';
 
   // Target row
   html += '<tr><td style="'+tdLabelS+'">Target</td>';
-  tVals.forEach(v => html += '<td style="'+tdTargS+'">'+v+'</td>');
+  tData.forEach(d => { html += '<td style="'+tdTargS+'">'+d.val+'</td>'; });
   html += '</tr>';
 
   // Result row
   html += '<tr><td style="'+tdLabelS+'">'+month+'</td>';
-  rVals.forEach((v, i) => {
-    const c = rColors[i];
-    const cellS = c.bg
-      ? 'background:'+c.bg+';color:'+c.fg+';font-size:14px;font-weight:800;padding:9px 12px;border:1px solid #374151;text-align:center;'
-      : 'background:#1f2937;color:#9ca3af;font-size:14px;font-weight:700;padding:9px 12px;border:1px solid #374151;text-align:center;';
-    html += '<td style="'+cellS+'">'+v+'</td>';
+  rData.forEach(d => {
+    html += '<td style="background:'+d.bg+';color:'+d.color+';font-size:15px;font-weight:800;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;">'+d.val+'</td>';
   });
   html += '</tr></table>';
 
-  // Plain text fallback
-  const plain = (agent ? 'Agent: '+agent+'\n' : '')
-    + headers.join('\t') + '\n'
-    + ['Target',...tVals].join('\t') + '\n'
-    + [month,...rVals].join('\t');
+  return html;
+}
 
-  const btn = document.querySelector('.btn-copy-main');
+function copyTable() {
+  const headers = ['KPI','FCR','AHT','Transfers','OB%','NBA Presentation',"Free SOC's",'CPC'];
+  const tKeys   = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  const month   = document.getElementById('month-inp').value || 'Result';
+  const agent   = document.getElementById('agent-name').value.trim() || '';
+
+  const tVals = ['Target', ...tKeys.map(k => document.getElementById('t-'+k).textContent.trim())];
+  const rVals = [month,    ...tKeys.map(k => document.getElementById('r-'+k).textContent.trim())];
+  const plain = (agent ? 'Agent: '+agent+'\n' : '') + [headers, tVals, rVals].map(r=>r.join('\t')).join('\n');
+
+  const html  = buildHtmlTable();
+
+  const btn  = document.querySelector('.btn-copy-main');
   const done = () => {
     btn.textContent = '✓ Copied!';
     setTimeout(() => btn.textContent = 'Copy', 2200);
   };
 
-  // Hidden contenteditable div — most reliable cross-browser HTML copy
+  // Use a hidden contenteditable div so execCommand copies real HTML
+  // This is the most compatible method across browsers and email clients
   const container = document.createElement('div');
   container.contentEditable = 'true';
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:600px;opacity:0;pointer-events:none;';
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;';
   container.innerHTML = html;
   document.body.appendChild(container);
 
+  // Try modern ClipboardItem first (Chrome 76+)
   if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
-    navigator.clipboard.write([new ClipboardItem({
-      'text/html':  new Blob([html],  {type:'text/html'}),
-      'text/plain': new Blob([plain], {type:'text/plain'}),
-    })]).then(() => {
+    navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html':  new Blob([html],  { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' }),
+      })
+    ]).then(() => {
       document.body.removeChild(container);
       done();
-    }).catch(() => execCopy(container, done));
+    }).catch(() => {
+      execCopy(container, plain, done);
+    });
   } else {
-    execCopy(container, done);
+    execCopy(container, plain, done);
   }
 }
 
-function execCopy(container, done) {
-  const sel = window.getSelection();
+function execCopy(container, plain, done) {
+  const sel   = window.getSelection();
   const range = document.createRange();
   range.selectNodeContents(container);
   sel.removeAllRanges();
   sel.addRange(range);
-  document.execCommand('copy');
+  try {
+    document.execCommand('copy');
+  } catch(e) {
+    // last resort: plain text via textarea
+    const ta = document.createElement('textarea');
+    ta.value = plain;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  sel.removeAllRanges();
+  if (container.parentNode) document.body.removeChild(container);
+  done();
+}
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI Extractor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:        #1a1a2e;
+  --panel:     #16213e;
+  --card:      #0f172a;
+  --input-bg:  #1e293b;
+  --border:    #2d3748;
+  --text:      #e2e8f0;
+  --text-muted:#94a3b8;
+  --text-dim:  #64748b;
+  --label:     #cbd5e1;
+  --title:     #ffffff;
+  --slot-bg:   #1e293b;
+  --slot-active:#3b82f6;
+  --btn-copy:  #3b82f6;
+  --btn-clear: #e53e3e;
+  --btn-back:  #276749;
+  --btn-fwd:   #6b21a8;
+  --badge-4pt: #22c55e;
+  --sun:       #fbbf24;
+}
+.light {
+  --bg:        #e8eaf0;
+  --panel:     #f1f3f7;
+  --card:      #ffffff;
+  --input-bg:  #f8f9fc;
+  --border:    #c9cdd6;
+  --text:      #1a202c;
+  --text-muted:#4a5568;
+  --text-dim:  #718096;
+  --label:     #2d3748;
+  --title:     #1a202c;
+  --slot-bg:   #dde1ea;
+  --slot-active:#3b82f6;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', Arial, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 20px 10px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.outer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 760px;
+}
+
+/* Left sidebar slots */
+.slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 72px;
+}
+.slot {
+  background: var(--slot-bg);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 5px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: background 0.1s;
+  user-select: none;
+}
+.slot:hover { background: var(--border); }
+.slot.active { background: var(--slot-active); color: #fff; border-color: var(--slot-active); }
+
+/* Main panel */
+.panel {
+  flex: 1;
+  background: var(--panel);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* Header */
+.panel-header {
+  background: var(--card);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.badge-4pt {
+  background: var(--badge-4pt);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.panel-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--title);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.theme-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px;
+}
+
+/* Body */
+.panel-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Field */
+.field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label);
+  margin-bottom: 5px;
+}
+.field input[type=text],
+.field input[type=number],
+.field select,
+.field textarea {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--slot-active);
+}
+.field textarea { resize: vertical; min-height: 60px; }
+.field select { cursor: pointer; }
+
+/* Row with inline button */
+.field-row { display: flex; gap: 8px; align-items: flex-end; }
+.field-row .field { flex: 1; }
+.prev-btn {
+  background: #e53e3e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  height: 36px;
+}
+
+/* Upload zone */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--input-bg);
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--slot-active);
+  background: var(--card);
+}
+.upload-zone input { display: none; }
+.upload-zone p { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.upload-zone strong { font-size: 13px; color: var(--text-muted); }
+
+/* Col map */
+details.col-map {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 12px;
+}
+details.col-map summary {
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+details.col-map table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+details.col-map td, details.col-map th {
+  padding: 4px 8px;
+  border-bottom: 0.5px solid var(--border);
+  color: var(--text-muted);
+}
+details.col-map th { font-weight: 700; color: var(--text-dim); }
+details.col-map input[type=text] {
+  width: 52px; padding: 3px 6px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--input-bg); color: var(--text);
+  text-align: center; text-transform: uppercase; outline: none;
+}
+.apply-btn {
+  margin-top: 8px; padding: 5px 14px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: 5px;
+  background: var(--input-bg); color: var(--text-muted); cursor: pointer;
+}
+.apply-btn:hover { border-color: var(--slot-active); color: var(--text); }
+
+/* Status */
+#status { font-size: 11px; color: var(--text-dim); min-height: 15px; }
+
+/* KPI Table */
+.kpi-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+table.kpi {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+table.kpi thead th {
+  background: var(--card);
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 9px 8px;
+  text-align: center;
+  border-right: 1px solid var(--bg);
+  border-bottom: 2px solid var(--bg);
+  white-space: nowrap;
+}
+table.kpi thead th:first-child { text-align: left; padding-left: 12px; width: 80px; }
+table.kpi thead th:last-child { border-right: none; }
+table.kpi tbody td {
+  padding: 9px 8px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  border-right: 1px solid var(--bg);
+  border-bottom: 1px solid var(--bg);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+table.kpi tbody td:first-child {
+  text-align: left; padding-left: 12px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  background: var(--card) !important;
+  color: var(--text-dim);
+  border-right: 2px solid var(--bg);
+}
+table.kpi tbody td:last-child { border-right: none; }
+table.kpi tbody tr:last-child td { border-bottom: none; }
+
+tr.t-row td { background: var(--input-bg); font-size: 12px; font-weight: 600; color: var(--text-muted); }
+tr.t-row td.editable { cursor: pointer; }
+tr.t-row td.editable:hover { filter: brightness(1.2); }
+tr.t-row td input.t-inp {
+  width: 100%; background: transparent; border: none;
+  border-bottom: 1px solid var(--slot-active);
+  color: var(--text); font-size: 12px; font-weight: 600;
+  text-align: center; outline: none; padding: 2px 0;
+}
+tr.r-row td { background: var(--card); font-size: 16px; font-weight: 800; }
+
+td.good  { background: #052e16 !important; color: #4ade80 !important; }
+td.warn  { background: #431407 !important; color: #fbbf24 !important; }
+td.bad   { background: #3b0007 !important; color: #f87171 !important; }
+td.neu   { background: var(--card) !important; color: var(--text-dim) !important; }
+td.blank { background: var(--input-bg) !important; color: var(--border) !important; font-size: 11px !important; font-weight: 500 !important; }
+
+.light td.good  { background: #dcfce7 !important; color: #15803d !important; }
+.light td.warn  { background: #fef9c3 !important; color: #a16207 !important; }
+.light td.bad   { background: #fee2e2 !important; color: #b91c1c !important; }
+
+/* Month input */
+#month-inp {
+  background: transparent; border: none;
+  border-bottom: 1px dashed var(--border);
+  color: var(--text-dim); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  width: 68px; outline: none; cursor: pointer; font-family: inherit;
+}
+
+/* Bottom action bar */
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.btn {
+  border: none; border-radius: 7px;
+  font-size: 13px; font-weight: 700;
+  padding: 10px 0; cursor: pointer;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  transition: filter 0.15s;
+}
+.btn:hover { filter: brightness(1.15); }
+.btn:active { filter: brightness(0.9); }
+.btn-copy-main { background: var(--btn-copy); color: #fff; flex: 2; min-width: 120px; }
+.btn-clear     { background: var(--btn-clear); color: #fff; flex: 2; min-width: 100px; }
+.btn-icon      { background: var(--card); color: var(--text-muted); border: 1px solid var(--border); width: 42px; padding: 0; height: 40px; font-size: 16px; flex-shrink: 0; }
+.btn-back      { background: var(--btn-back); color: #fff; width: 42px; padding: 0; height: 40px; font-size: 16px; flex-shrink: 0; }
+.btn-fwd       { background: var(--btn-fwd);  color: #fff; width: 42px; padding: 0; height: 40px; font-size: 16px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="outer">
+
+  <!-- Left slots -->
+  <div class="slots" id="slots"></div>
+
+  <!-- Main panel -->
+  <div class="panel" id="main-panel">
+
+    <!-- Header -->
+    <div class="panel-header">
+      <span class="badge-4pt">4 point memo</span>
+      <span class="panel-title">KPI Extractor</span>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">🌙</button>
+    </div>
+
+    <div class="panel-body">
+
+      <!-- Agent Name -->
+      <div class="field">
+        <label>Agent Name :</label>
+        <input type="text" id="agent-name" placeholder="Enter agent name" autocomplete="off">
+      </div>
+
+      <!-- Upload -->
+      <div class="field">
+        <label>Upload Excel Sheet :</label>
+        <div class="upload-zone" id="drop-zone"
+          onclick="document.getElementById('fin').click()"
+          ondragover="onDrag(event,true)"
+          ondragleave="onDrag(event,false)"
+          ondrop="onDrop(event)">
+          <input type="file" id="fin" accept=".xlsx,.xls,.csv" onchange="loadFile(this.files[0])">
+          <strong id="upload-label">📁 Click or drag your Excel file here</strong>
+          <p>Supports .xlsx · .xls · .csv</p>
+        </div>
+      </div>
+
+      <!-- Column mappings -->
+      <details class="col-map">
+        <summary>⚙️ Column mappings (click to edit)</summary>
+        <table>
+          <tr><th>Metric</th><th>Column</th><th>Method</th></tr>
+          <tr><td>FCR</td>              <td><input id="c-fcr"   type="text" value="E"></td>  <td>average → %</td></tr>
+          <tr><td>AHT</td>              <td><input id="c-aht"   type="text" value="AR"></td> <td>average → sec</td></tr>
+          <tr><td>Transfers</td>        <td><input id="c-trans" type="text" value="BB"></td> <td>average → %</td></tr>
+          <tr><td>OB%</td>              <td><input id="c-ob"    type="text" value=""></td>   <td>leave blank</td></tr>
+          <tr><td>NBA Presentation</td> <td><input id="c-nba"   type="text" value="FL"></td> <td>average → %</td></tr>
+          <tr><td>Free SOC's</td>       <td><input id="c-soc"   type="text" value="DI"></td> <td>average → %</td></tr>
+          <tr><td>CPC</td>              <td><input id="c-cpc"   type="text" value="DK"></td> <td>average → £</td></tr>
+        </table>
+        <button class="apply-btn" onclick="recompute()">Apply & recalculate</button>
+      </details>
+
+      <!-- Status -->
+      <div id="status"></div>
+
+      <!-- Targets -->
+      <div class="field">
+        <label>Targets : <span style="font-size:11px;font-weight:400;color:var(--text-dim)">(click a value to edit)</span></label>
+      </div>
+
+      <!-- KPI Table -->
+      <div class="kpi-wrap">
+        <table class="kpi" id="kpi-table">
+          <thead>
+            <tr>
+              <th>KPI</th>
+              <th>FCR</th>
+              <th>AHT</th>
+              <th>Transfers</th>
+              <th>OB%</th>
+              <th>NBA Pres.</th>
+              <th>Free SOC's</th>
+              <th>CPC</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="t-row">
+              <td>Target</td>
+              <td class="editable" onclick="editTarget(this,'fcr')"   id="t-fcr">78.7%</td>
+              <td class="editable" onclick="editTarget(this,'aht')"   id="t-aht">900</td>
+              <td class="editable" onclick="editTarget(this,'trans')" id="t-trans">7%</td>
+              <td class="editable" onclick="editTarget(this,'ob')"    id="t-ob">12%</td>
+              <td class="editable" onclick="editTarget(this,'nba')"   id="t-nba">25%</td>
+              <td class="editable" onclick="editTarget(this,'soc')"   id="t-soc">15%</td>
+              <td class="editable" onclick="editTarget(this,'cpc')"   id="t-cpc">£0.37</td>
+            </tr>
+            <tr class="r-row">
+              <td><input id="month-inp" type="text" value="April" title="Click to rename"></td>
+              <td class="neu" id="r-fcr">—</td>
+              <td class="neu" id="r-aht">—</td>
+              <td class="neu" id="r-trans">—</td>
+              <td class="blank" id="r-ob">N/A</td>
+              <td class="neu" id="r-nba">—</td>
+              <td class="neu" id="r-soc">—</td>
+              <td class="neu" id="r-cpc">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Action bar -->
+      <div class="actions">
+        <button class="btn btn-copy-main" onclick="copyTable()">Copy</button>
+        <button class="btn btn-clear"     onclick="clearAll()">Clear</button>
+        <button class="btn btn-icon"      onclick="clearAll()" title="Delete">🗑️</button>
+        <button class="btn btn-back"      onclick="prevSlot()" title="Previous">↩</button>
+        <button class="btn btn-fwd"       onclick="nextSlot()" title="Next">↪</button>
+      </div>
+
+    </div><!-- /panel-body -->
+  </div><!-- /panel -->
+</div><!-- /outer -->
+
+<script>
+/* ---- Slots ---- */
+let activeSlot = 1;
+const TOTAL_SLOTS = 30;
+const slotsEl = document.getElementById('slots');
+for (let i = 1; i <= TOTAL_SLOTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'slot' + (i === 1 ? ' active' : '');
+  d.textContent = i;
+  d.dataset.slot = i;
+  d.addEventListener('click', () => activateSlot(i));
+  slotsEl.appendChild(d);
+}
+function activateSlot(n) {
+  activeSlot = n;
+  document.querySelectorAll('.slot').forEach(s => s.classList.toggle('active', +s.dataset.slot === n));
+  document.querySelector('.panel-title').textContent = 'KPI EXTRACTOR';
+}
+function prevSlot() { if (activeSlot > 1) activateSlot(activeSlot - 1); }
+function nextSlot() { if (activeSlot < TOTAL_SLOTS) activateSlot(activeSlot + 1); }
+
+/* ---- Theme ---- */
+let isDark = true;
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.classList.toggle('light', !isDark);
+  document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
+}
+
+/* ---- Targets ---- */
+const targets = {
+  fcr:   { raw: 0.787, type: 'pct', higherBetter: true  },
+  aht:   { raw: 900,   type: 'num', higherBetter: false },
+  trans: { raw: 0.07,  type: 'pct', higherBetter: false },
+  ob:    { raw: 0.12,  type: 'pct', higherBetter: true  },
+  nba:   { raw: 0.25,  type: 'pct', higherBetter: true  },
+  soc:   { raw: 0.15,  type: 'pct', higherBetter: true  },
+  cpc:   { raw: 0.37,  type: 'gbp', higherBetter: false },
+};
+
+function editTarget(td, key) {
+  if (td.querySelector('input')) return;
+  const cur = td.textContent.trim();
+  td.textContent = '';
+  const inp = document.createElement('input');
+  inp.className = 't-inp';
+  inp.value = cur;
+  td.appendChild(inp);
+  inp.focus(); inp.select();
+  function commit() {
+    const val = inp.value.trim() || cur;
+    td.textContent = val;
+    parseTarget(key, val);
+    recompute();
+  }
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+}
+
+function parseTarget(key, str) {
+  const t = targets[key];
+  const num = parseFloat(str.replace(/[£%,\s]/g,''));
+  if (isNaN(num)) return;
+  if (str.includes('%'))      { t.raw = num/100; t.type = 'pct'; }
+  else if (str.includes('£')) { t.raw = num;     t.type = 'gbp'; }
+  else                        { t.raw = num;     t.type = 'num'; }
+}
+
+/* ---- Excel helpers ---- */
+let wb = null;
+
+function colIndex(letters) {
+  if (!letters) return -1;
+  letters = letters.toUpperCase().trim();
+  let n = 0;
+  for (let i = 0; i < letters.length; i++) n = n*26 + (letters.charCodeAt(i)-64);
+  return n-1;
+}
+
+function getColValues(ws, col) {
+  if (!col) return [];
+  const range = XLSX.utils.decode_range(ws['!ref']||'A1');
+  const ci = colIndex(col);
+  if (ci < 0) return [];
+  const vals = [];
+  for (let r = 1; r <= range.e.r; r++) {
+    const cell = ws[XLSX.utils.encode_cell({r, c:ci})];
+    if (cell && typeof cell.v === 'number' && !isNaN(cell.v)) vals.push(cell.v);
+  }
+  return vals;
+}
+
+function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
+
+function colorClass(key, val) {
+  const t = targets[key];
+  if (val === null || key === 'ob') return key==='ob' ? 'blank' : 'neu';
+  const r = val / t.raw;
+  if (t.higherBetter) { return r>=0.97?'good':r>=0.88?'warn':'bad'; }
+  else                { return r<=1.03?'good':r<=1.12?'warn':'bad'; }
+}
+
+function fmtVal(key, val) {
+  if (val === null) return '—';
+  const t = targets[key];
+  if (t.type==='pct') return (val*100).toFixed(1)+'%';
+  if (t.type==='gbp') return '£'+val.toFixed(2);
+  if (key==='aht') { const m=Math.floor(val/60),s=Math.round(val%60); return m+':'+String(s).padStart(2,'0'); }
+  return Math.round(val).toLocaleString();
+}
+
+function onDrag(e, over) { e.preventDefault(); document.getElementById('drop-zone').classList.toggle('drag-over', over); }
+function onDrop(e) { e.preventDefault(); onDrag(e,false); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); }
+
+function loadFile(file) {
+  if (!file) return;
+  document.getElementById('status').textContent = 'Reading '+file.name+'…';
+  document.getElementById('upload-label').textContent = '✅ '+file.name;
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      wb = XLSX.read(e.target.result, {type:'array'});
+      recompute();
+    } catch(err) {
+      document.getElementById('status').textContent = 'Error: '+err.message;
+    }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function recompute() {
+  if (!wb) return;
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const cols = {
+    fcr: document.getElementById('c-fcr').value,
+    aht: document.getElementById('c-aht').value,
+    trans: document.getElementById('c-trans').value,
+    ob: document.getElementById('c-ob').value,
+    nba: document.getElementById('c-nba').value,
+    soc: document.getElementById('c-soc').value,
+    cpc: document.getElementById('c-cpc').value,
+  };
+  ['fcr','aht','trans','ob','nba','soc','cpc'].forEach(key => {
+    const cell = document.getElementById('r-'+key);
+    if (key==='ob') { cell.textContent='N/A'; cell.className='blank'; return; }
+    const val = avg(getColValues(ws, cols[key]));
+    cell.textContent = fmtVal(key, val);
+    cell.className = colorClass(key, val);
+  });
+  document.getElementById('status').textContent =
+    'Sheet: "'+wb.SheetNames[0]+'" · '+new Date().toLocaleTimeString();
+}
+
+/* ---- Clear ---- */
+function clearAll() {
+  document.getElementById('agent-name').value = '';
+  wb = null;
+  document.getElementById('upload-label').textContent = '📁 Click or drag your Excel file here';
+  document.getElementById('fin').value = '';
+  document.getElementById('status').textContent = '';
+  ['fcr','aht','trans','ob','nba','soc','cpc'].forEach(key => {
+    const cell = document.getElementById('r-'+key);
+    cell.textContent = key==='ob' ? 'N/A' : '—';
+    cell.className   = key==='ob' ? 'blank' : 'neu';
+  });
+}
+
+/* ---- Copy ---- */
+function buildHtmlTable() {
+  const headers = ['KPI','FCR','AHT','Transfers','OB%','NBA Presentation',"Free SOC's",'CPC'];
+  const tKeys   = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  const month   = document.getElementById('month-inp').value || 'Result';
+  const agent   = document.getElementById('agent-name').value.trim() || '';
+
+  const tData = tKeys.map(k => ({ val: document.getElementById('t-'+k).textContent.trim() }));
+  const rData = tKeys.map(k => {
+    const el  = document.getElementById('r-'+k);
+    const cls = el.className;
+    // Light-mode friendly colors for email/paste
+    const bg    = cls==='good' ? '#d1fae5' : cls==='warn' ? '#fef3c7' : cls==='bad' ? '#fee2e2' : cls==='blank' ? '#f1f5f9' : '#f8fafc';
+    const color = cls==='good' ? '#065f46' : cls==='warn' ? '#92400e' : cls==='bad' ? '#991b1b' : cls==='blank' ? '#94a3b8' : '#475569';
+    return { val: el.textContent.trim(), bg, color };
+  });
+
+  // Styles — white background always so it works in any email client
+  const tableS  = 'border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;background:#ffffff;width:100%;';
+  const agentS  = 'background:#f1f5f9;color:#334155;font-size:13px;padding:10px 12px;border:1px solid #e2e8f0;font-weight:600;letter-spacing:0.02em;';
+  const thS     = 'background:#1e293b;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:10px 12px;text-align:center;border:1px solid #334155;white-space:nowrap;';
+  const th1S    = 'background:#1e293b;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:10px 12px;text-align:left;border:1px solid #334155;white-space:nowrap;';
+  const tdLabelS= 'background:#334155;color:#e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;padding:10px 12px;text-align:left;border:1px solid #475569;white-space:nowrap;';
+  const tdTargS = 'background:#f8fafc;color:#64748b;font-size:13px;font-weight:600;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;';
+
+  let html = '<table style="'+tableS+'">';
+
+  // Agent row (only if name entered)
+  if (agent) {
+    html += '<tr><td colspan="8" style="'+agentS+'">&#128100; Agent: <span style="color:#0f172a;font-size:14px;">'+agent+'</span></td></tr>';
+  }
+
+  // Header row
+  html += '<tr><th style="'+th1S+'">KPI</th>';
+  headers.slice(1).forEach(h => { html += '<th style="'+thS+'">'+h+'</th>'; });
+  html += '</tr>';
+
+  // Target row
+  html += '<tr><td style="'+tdLabelS+'">Target</td>';
+  tData.forEach(d => { html += '<td style="'+tdTargS+'">'+d.val+'</td>'; });
+  html += '</tr>';
+
+  // Result row
+  html += '<tr><td style="'+tdLabelS+'">'+month+'</td>';
+  rData.forEach(d => {
+    html += '<td style="background:'+d.bg+';color:'+d.color+';font-size:15px;font-weight:800;padding:10px 12px;text-align:center;border:1px solid #e2e8f0;">'+d.val+'</td>';
+  });
+  html += '</tr></table>';
+
+  return html;
+}
+
+function copyTable() {
+  const headers = ['KPI','FCR','AHT','Transfers','OB%','NBA Presentation',"Free SOC's",'CPC'];
+  const tKeys   = ['fcr','aht','trans','ob','nba','soc','cpc'];
+  const month   = document.getElementById('month-inp').value || 'Result';
+  const agent   = document.getElementById('agent-name').value.trim() || '';
+
+  const tVals = ['Target', ...tKeys.map(k => document.getElementById('t-'+k).textContent.trim())];
+  const rVals = [month,    ...tKeys.map(k => document.getElementById('r-'+k).textContent.trim())];
+  const plain = (agent ? 'Agent: '+agent+'\n' : '') + [headers, tVals, rVals].map(r=>r.join('\t')).join('\n');
+
+  const html  = buildHtmlTable();
+
+  const btn  = document.querySelector('.btn-copy-main');
+  const done = () => {
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2200);
+  };
+
+  // Use a hidden contenteditable div so execCommand copies real HTML
+  // This is the most compatible method across browsers and email clients
+  const container = document.createElement('div');
+  container.contentEditable = 'true';
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;';
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  // Try modern ClipboardItem first (Chrome 76+)
+  if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+    navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html':  new Blob([html],  { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' }),
+      })
+    ]).then(() => {
+      document.body.removeChild(container);
+      done();
+    }).catch(() => {
+      execCopy(container, plain, done);
+    });
+  } else {
+    execCopy(container, plain, done);
+  }
+}
+
+function execCopy(container, plain, done) {
+  const sel   = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(container);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  try {
+    document.execCommand('copy');
+  } catch(e) {
+    // last resort: plain text via textarea
+    const ta = document.createElement('textarea');
+    ta.value = plain;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
   sel.removeAllRanges();
   if (container.parentNode) document.body.removeChild(container);
   done();

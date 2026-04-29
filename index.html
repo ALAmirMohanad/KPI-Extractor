@@ -396,13 +396,13 @@ td.blank { background: var(--input-bg) !important; color: var(--border) !importa
         <summary>⚙️ Column mappings (click to edit)</summary>
         <table>
           <tr><th>Metric</th><th>Column</th><th>Method</th></tr>
-          <tr><td>FCR</td>              <td><input id="c-fcr"   type="text" value="E"  oninput="saveColMap()"></td>  <td>average → %</td></tr>
-          <tr><td>AHT</td>              <td><input id="c-aht"   type="text" value="AR" oninput="saveColMap()"></td> <td>average → sec</td></tr>
-          <tr><td>Transfers</td>        <td><input id="c-trans" type="text" value="BB" oninput="saveColMap()"></td> <td>average → %</td></tr>
+          <tr><td>FCR</td>              <td><input id="c-fcr"   type="text" value="E"  oninput="saveColMap()"></td>  <td>last value → %</td></tr>
+          <tr><td>AHT</td>              <td><input id="c-aht"   type="text" value="AR" oninput="saveColMap()"></td> <td>last value → sec</td></tr>
+          <tr><td>Transfers</td>        <td><input id="c-trans" type="text" value="BB" oninput="saveColMap()"></td> <td>last value → %</td></tr>
           <tr><td>OB%</td>              <td><input id="c-ob"    type="text" value=""   oninput="saveColMap()"></td>   <td>leave blank</td></tr>
-          <tr><td>NBA Presentation</td> <td><input id="c-nba"   type="text" value="FL" oninput="saveColMap()"></td> <td>average → %</td></tr>
-          <tr><td>Free SOC's</td>       <td><input id="c-soc"   type="text" value="DI" oninput="saveColMap()"></td> <td>average → %</td></tr>
-          <tr><td>CPC</td>              <td><input id="c-cpc"   type="text" value="DK" oninput="saveColMap()"></td> <td>average → £</td></tr>
+          <tr><td>NBA Presentation</td> <td><input id="c-nba"   type="text" value="FL" oninput="saveColMap()"></td> <td>last value → %</td></tr>
+          <tr><td>Free SOC's</td>       <td><input id="c-soc"   type="text" value="DI" oninput="saveColMap()"></td> <td>last value → %</td></tr>
+          <tr><td>CPC</td>              <td><input id="c-cpc"   type="text" value="DK" oninput="saveColMap()"></td> <td>last value → £</td></tr>
         </table>
       </details>
 
@@ -708,7 +708,7 @@ function startExtract() {
     log('\n[' + key.toUpperCase() + '] col="' + s.colMap[key] + '"');
     const vals = getColValues(ws, s.colMap[key]);
     results[key] = avg(vals);
-    log('  → avg = ' + (results[key] !== null ? results[key] : 'no data'));
+    log('  → result = ' + (results[key] !== null ? results[key] : 'no data'));
   });
 
   s.results   = results;
@@ -832,6 +832,19 @@ function cellToNumber(cell) {
   return null;
 }
 
+function findTotalRow(ws) {
+  if (!ws['!ref']) return -1;
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let r = 0; r <= range.e.r; r++) {
+    const cell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
+    if (cell && typeof cell.v === 'string' && cell.v.trim().toLowerCase() === 'total') {
+      log('  Total row found at index ' + r + ' (Excel row ' + (r + 1) + ')');
+      return r;
+    }
+  }
+  return -1;
+}
+
 function getColValues(ws, col) {
   if (!col || !col.trim()) return [];
   col = col.toUpperCase().trim();
@@ -840,21 +853,32 @@ function getColValues(ws, col) {
   const ci = colIndex(col);
   if (ci < 0 || ci > range.e.c) { log('  ⚠ Column ' + col + ' out of range'); return []; }
 
-  // Auto-detect start row
-  let startRow = 1;
-  for (let r = 0; r <= Math.min(9, range.e.r); r++) {
-    const cell = ws[XLSX.utils.encode_cell({ r, c: ci })];
-    if (cellToNumber(cell) !== null) { startRow = r; break; }
+  // Strategy 1: find the "Total" row by looking at column A
+  const totalRow = findTotalRow(ws);
+  if (totalRow >= 0) {
+    const v = cellToNumber(ws[XLSX.utils.encode_cell({ r: totalRow, c: ci })]);
+    if (v !== null) {
+      log('  Col ' + col + ': Total row value = ' + (v.toFixed ? v.toFixed(3) : v));
+      return [v];
+    }
+    log('  Col ' + col + ': Total row found but cell empty, falling back to last value');
+  } else {
+    log('  Col ' + col + ': No Total row in col A, falling back to last value');
   }
-  log('  Col ' + col + ': data from row ' + startRow + ' to ' + range.e.r);
 
-  const vals = [];
-  for (let r = startRow; r <= range.e.r; r++) {
+  // Strategy 2 (fallback): last non-null numeric value after row index 2
+  const DATA_START_ROW = 2;
+  let lastVal = null, lastRow = -1;
+  for (let r = DATA_START_ROW; r <= range.e.r; r++) {
     const v = cellToNumber(ws[XLSX.utils.encode_cell({ r, c: ci })]);
-    if (v !== null) vals.push(v);
+    if (v !== null) { lastVal = v; lastRow = r; }
   }
-  log('  Col ' + col + ': ' + vals.length + ' values, sample: ' + vals.slice(0,5).map(x => x.toFixed ? x.toFixed(3) : x).join(', '));
-  return vals;
+  if (lastVal !== null) {
+    log('  Col ' + col + ': fallback last value at row ' + lastRow + ' = ' + (lastVal.toFixed ? lastVal.toFixed(3) : lastVal));
+    return [lastVal];
+  }
+  log('  Col ' + col + ': no numeric data found');
+  return [];
 }
 
 function avg(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null; }
